@@ -1,91 +1,166 @@
 # Spatio Studio
 
-**3D modeling studio for young creators, ages 6-14.**
+**Free, offline, no-telemetry 3D modeling for kids ages 6–14.**
 
-Spatio Studio is a desktop application that lets kids build, paint, animate, and
-export 3D models. It runs entirely offline — no accounts, no network calls,
-no ads — making it safe for classroom and at-home use.
+Spatio Studio is a desktop application that lets students build, paint,
+animate, and export 3D models. It is designed for classrooms, homes,
+and computer labs — and is **architecturally incapable of making a
+network connection.** No accounts, no cloud, no analytics, no auto-
+updater, no data collection of any kind.
 
-## Features
+Part of the Heronix Education Platform. © Heronix Educational Software.
 
-- **29 built-in shapes** across Basic, Fun, Geometric, and Advanced categories
-- **Transform tools:** Select, Move, Rotate, Scale, Pan, with grid snapping
-- **CSG operations:** Solid / Hole toggle, Group, Ungroup — cut tubes, rings, and letters
-- **Paint mode** with a color picker (per-face coloring)
-- **SVG import** — extrude any `.svg` drawing or logo into a 3D object
-- **Precision modifiers:** live mirror, array, align/distribute, ruler, frame camera
-- **Advanced modeling:** multi-level subdivision/smoothing, material presets, cross-section viewer with live area calc
-- **Animation timeline** — record keyframes and play back position/rotation/scale changes
-- **3D text** — four bundled fonts (Helvetiker, Optimer; regular + bold)
-- **Stamp library** — save and reuse your own shapes
-- **Learning mode:** 3 interactive lessons, coordinate challenges, and 25+ shape-quiz questions
-- **Export:** STL, OBJ, GLTF for 3D printers and game engines, plus PNG screenshots
-- **Save format v2** for projects — a single `.spatio` file
+---
 
-## Tech stack
+## At a glance
 
-- **Java 17** — Swing/AWT host application
-- **JCEF** (Chromium Embedded Framework, via `me.friwi:jcefmaven`) — embedded browser
-- **Three.js** (WebGL) — 3D rendering
-- **Gson** — save/load bridge serialization
-- **Maven** with the shade plugin for a single-file fat JAR
+- **29 built-in shapes** — basic solids, fun shapes, platonic solids,
+  advanced geometry.
+- **Transform tools:** Select, Move, Rotate, Scale, Pan, with grid
+  snapping, multi-select, and live gizmos.
+- **CSG:** Solid / Hole / Group / Ungroup — cut tubes, rings, letters,
+  and custom holes from any shape.
+- **Paint mode** with a color picker and per-face coloring.
+- **SVG import** — extrude any `.svg` drawing or logo into a 3D object.
+- **Precision modifiers:** live mirror, array, align / distribute,
+  ruler, frame camera, cross-section with live area calc.
+- **Animation timeline** — keyframe positions, rotations, and scales
+  and play back with smooth interpolation.
+- **3D text** — four bundled fonts (Helvetiker, Optimer; regular + bold),
+  plus quick A–Z and 0–9 letter generators.
+- **Stamp library** — save and reuse your own shapes.
+- **Learning mode:** three interactive tutorials, coordinate challenges,
+  and 25+ shape-quiz questions.
+- **Export:** STL, OBJ, and GLTF for 3D printers, game engines, and AR,
+  plus PNG screenshots.
+- **Save format v2** — a single `.spatio` JSON file per project.
 
-## Requirements
+---
 
-- Java 17 or newer (for both build and run)
-- Any GPU with WebGL support
-- Windows 10+, macOS 11+, or Linux (x86-64)
-- 4 GB RAM minimum (8 GB recommended)
+## Offline by construction
 
-## Building
+This is the project's strongest claim and the reason it is safe for K-12
+deployment. Spatio cannot connect to the internet, even if a future
+dependency, malicious SVG, or stray JS tried to. Three independent
+layers enforce this at runtime:
 
-```bash
+1. **Chromium's DNS resolver** is set to return `NOTFOUND` for every
+   host.
+2. **Chromium's proxy** is pointed at a closed loopback port that
+   refuses connections.
+3. **Every non-local resource load** (XHR, fetch, img, script,
+   stylesheet, etc.) is cancelled at the JCEF request-handler level
+   unless the URL scheme is `file:`, `data:`, `blob:`, `about:`, or
+   `chrome-devtools:`.
+
+On top of that:
+
+- The Chromium runtime itself is **pre-bundled as a classpath resource**
+  (via `me.friwi:jcef-natives-windows-amd64`), so no ~120 MB first-
+  launch download ever happens. The app fails fast if the bundle is
+  somehow missing, rather than falling back to the network.
+- jcefmaven's mirror list is **emptied at startup** to remove the
+  download path entirely.
+- Chromium is started with every known telemetry / background-service
+  flag disabled: component updater, breakpad, crash reporter, domain
+  reliability, sync, translate, speech API, metrics reporting, hyperlink
+  auditing, autofill server, and more.
+- The JCEF browser is hardened: **DevTools disabled**, popups blocked,
+  top-level navigation to non-local URLs blocked, auth credentials
+  never supplied.
+
+**Verify it yourself:** install the app, cut the machine off the
+network, delete `%USERPROFILE%\.spatio-studio\`, launch. The app extracts
+Chromium from its own JAR, starts, and runs. A Wireshark capture on the
+host will show zero packets leaving the machine.
+
+---
+
+## Quick start
+
+### Run the app
+
+1. Install Java 17 or newer. Check: `java -version`.
+2. Download `spatio-studio-1.0.0-SNAPSHOT.jar`.
+3. Double-click, or run:
+
+   ```
+   java -jar spatio-studio-1.0.0-SNAPSHOT.jar
+   ```
+
+First launch takes about 30 seconds (one-time extraction of the bundled
+Chromium runtime). Every launch after is instant.
+
+### Build from source
+
+```
 mvn clean package
 ```
 
-Produces `target/spatio-studio-1.0.0-SNAPSHOT.jar` (~17 MB fat JAR).
+Produces `target/spatio-studio-1.0.0-SNAPSHOT.jar` — a roughly 157 MB
+fat JAR with the Windows x64 Chromium natives bundled in. Ready to
+ship.
 
-## Running
+For other platforms and thin dev builds, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
 
-```bash
-java -jar target/spatio-studio-1.0.0-SNAPSHOT.jar
-```
+---
 
-On first launch the app downloads ~120 MB of JCEF native libraries into
-`~/.spatio-studio/jcef/`. This is a one-time step; subsequent launches are
-immediate.
+## Documentation
+
+- **[ABOUT.md](ABOUT.md)** — project mission, philosophy, credits,
+  license.
+- **[docs/INSTALLATION.md](docs/INSTALLATION.md)** — install, build,
+  and deploy. Has sections for end users, developers, and district IT.
+- **[docs/USER-MANUAL.md](docs/USER-MANUAL.md)** — every feature
+  walked through, plus teacher tips and troubleshooting.
+
+---
+
+## Requirements
+
+- Java 17 or newer (build and run).
+- Any GPU with WebGL support — integrated Intel graphics are enough.
+- Windows 10+ (primary). macOS 11+ via an opt-in build profile.
+- 4 GB RAM minimum, 8 GB recommended.
+- 500 MB free disk space (the one-time Chromium extraction takes ~300 MB).
+
+---
+
+## Tech stack
+
+- **Java 17** Swing/AWT host application.
+- **JCEF** (Chromium Embedded Framework, via `me.friwi:jcefmaven`
+  135.0.20) — embedded browser with the native runtime bundled.
+- **Three.js** (WebGL) — 3D rendering, transforms, exports.
+- **Gson** — save/load bridge serialization.
+- **Maven** with the shade plugin for a single-file fat JAR, plus
+  profiles per target platform.
+
+---
 
 ## Project layout
 
 ```
-pom.xml                                       Maven build
+pom.xml                                   Maven build + native-bundle profiles
+ABOUT.md                                  Project mission and credits
+docs/
+  INSTALLATION.md                         Install, build, deploy
+  USER-MANUAL.md                          Feature walk-through
 src/main/java/com/heronixedu/spatio/
-  Launcher.java                               main() entry point
-  SpatioApplication.java                      Swing + JCEF host
-  bridge/JavaBridge.java                      JS <-> Java file-IO bridge
+  Launcher.java                           main() entry point
+  SpatioApplication.java                  Swing + JCEF host, hardening
+  bridge/JavaBridge.java                  JS <-> Java file I/O bridge
 src/main/resources/spatio/
-  index.html                                  Spatio Studio UI
-  css/                                        Stylesheets
-  js/                                         ~30 feature modules (shapes, CSG,
-                                              paint, SVG import, animation,
-                                              tutorials, challenges, etc.)
-  fonts/                                      Helvetiker + Optimer typefaces
-  images/                                     App icons and logos
-src/main/resources/images/                    Shared Heronix branding assets
+  index.html                              UI
+  css/                                    stylesheets
+  js/                                     ~30 feature modules
+  fonts/                                  Helvetiker + Optimer typefaces
+  images/                                 app icons and logos
 ```
 
-## Security posture
-
-- JCEF is launched with DevTools disabled (`remote_debugging_port = 0`)
-- External navigation is blocked (`CefRequestHandler.onBeforeBrowse` only
-  permits `file://` URLs from the extracted temp dir)
-- Popups are blocked (`CefLifeSpanHandler.onBeforePopup` returns `true`)
-- Background networking, extensions, sync, translate, and the media router
-  are all disabled at JCEF start
-
-See `src/main/java/com/heronixedu/spatio/SpatioApplication.java` for the full
-hardened startup sequence.
+---
 
 ## License
 
 Part of the Heronix Education Platform. © Heronix Educational Software.
+See `ABOUT.md` for full credits.
