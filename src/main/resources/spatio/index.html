@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spatio Studio</title>
+<link rel="stylesheet" href="css/fredoka.css">
+<link rel="stylesheet" href="css/spatio.css">
+<script>
+// Global error handler — catches all JS errors and displays them
+window.onerror = function(msg, url, line, col, err) {
+  var short = url ? url.split('/').pop() : '?';
+  var errMsg = 'JS ERROR: ' + msg + ' in ' + short + ':' + line;
+  console.error(errMsg);
+  document.title = errMsg;
+  // Show on page if splash is still visible
+  var status = document.getElementById('splash-status');
+  if (status) status.textContent = errMsg;
+  return false;
+};
+</script>
+<script src="js/three.min.js"></script>
+<script src="js/three-csg.js"></script>
+<script src="js/TransformControls.js"></script>
+<script src="js/GLTFExporter.js"></script>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash">
+  <div id="splash-inner">
+    <img id="splash-logo" src="images/SVG/Text Logo_Horizontal.svg" alt="Heronix" onerror="this.style.display='none'">
+    <div id="splash-title"><span class="k">Spati</span><span class="l2">o</span> STUDIO</div>
+    <div id="splash-sub">3D Modeling for Young Creators</div>
+    <div id="splash-bar-track"><div id="splash-bar"></div></div>
+    <div id="splash-status">Loading...</div>
+    <div id="splash-copy">&#169; Heronix Educational Software</div>
+  </div>
+</div>
+
+<!-- TOP BAR — Two clean rows -->
+<div id="topbar-wrap">
+  <!-- Row 1: Brand + Transform + Edit -->
+  <div class="tb-row">
+    <div id="logo">
+      <span class="brand-tag">HERONIX</span>
+      <span class="k">Spati</span><span class="l2">o</span>
+      <span class="logo-sub">STUDIO</span>
+    </div>
+    <div class="sep"></div>
+    <button class="tbtn active" id="btn-select" onclick="setMode('select')">
+      <svg viewBox="0 0 24 24"><path d="M5 3l14 9-7 1.5-4 7z"/></svg>Select
+    </button>
+    <button class="tbtn" id="btn-move" onclick="setMode('move')">
+      <svg viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/></svg>Move
+    </button>
+    <button class="tbtn" id="btn-rotate" onclick="setMode('rotate')">
+      <svg viewBox="0 0 24 24"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>Rotate
+    </button>
+    <button class="tbtn" id="btn-scale" onclick="setMode('scale')">
+      <svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>Scale
+    </button>
+    <button class="tbtn" id="btn-pan" onclick="setMode('pan')">
+      <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V5a2 2 0 0 0-4 0v9"/><path d="M18 11a2 2 0 0 1 4 0v7a8 8 0 0 1-8 8h-2c-2.5 0-4.3-1-5.7-2.7L3 18.7a1.7 1.7 0 0 1 .3-2.4 1.7 1.7 0 0 1 2.4.3L8 19V6"/></svg>Pan
+    </button>
+    <div class="sep"></div>
+    <button class="abtn btn-undo" onclick="undo()">&#8617; Undo</button>
+    <button class="abtn btn-copy" onclick="duplicateSelected()">&#10697; Copy</button>
+    <button class="abtn btn-clr" onclick="clearScene()">&#128465;</button>
+    <div class="sep"></div>
+    <button class="abtn btn-paint" id="btn-paint" onclick="togglePaintMode()">&#x1f3a8; Paint</button>
+    <input type="color" id="paint-color-pick" value="#ef4444" oninput="setPaintColor(this.value)" title="Paint color" style="width:24px;height:24px;border:none;border-radius:4px;cursor:pointer;padding:0;background:none">
+    <button class="abtn btn-import-svg" onclick="importSVG()">&#x1f5bc; SVG</button>
+    <div class="toolbar-spacer"></div>
+    <button class="abtn btn-save" onclick="saveProject()">&#x1f4be; Save</button>
+    <button class="abtn btn-load" onclick="loadProject()">&#x1f4c2; Open</button>
+    <button class="abtn btn-shortcuts" onclick="toggleShortcuts()" title="Keyboard shortcuts">&#x2328;</button>
+    <button class="abtn btn-exit" onclick="exitApp()">&#x274c;</button>
+  </div>
+  <!-- Row 2: CSG + Snap + Export + Screenshot -->
+  <div class="tb-row tb-row2">
+    <button class="abtn btn-hole" id="btn-hole" onclick="toggleHoleSelected()">&#9673; Solid</button>
+    <button class="abtn btn-group" onclick="groupSelected()">&#8853; Group</button>
+    <button class="abtn btn-ungroup" onclick="ungroupSelected()">&#8854; Ungroup</button>
+    <div class="sep"></div>
+    <button class="abtn btn-snap active" id="btn-snap" onclick="toggleSnap()">&#8862; Snap</button>
+    <select class="snap-select" onchange="setSnapSize(this.value)" title="Grid size">
+      <option value="0.25">0.25</option>
+      <option value="0.5" selected>0.5</option>
+      <option value="1">1.0</option>
+      <option value="2">2.0</option>
+    </select>
+    <div class="sep"></div>
+    <button class="abtn btn-mirror" id="btn-mirror" onclick="toggleMirrorMode()">&#x1fa9e; Mirror</button>
+    <button class="meas-ubtn maxis-btn maxis-btn-x active" onclick="setMirrorAxis('x')" style="color:#ff8888" title="Mirror X">X</button>
+    <button class="meas-ubtn maxis-btn maxis-btn-y" onclick="setMirrorAxis('y')" style="color:#5eff8a" title="Mirror Y">Y</button>
+    <button class="meas-ubtn maxis-btn maxis-btn-z" onclick="setMirrorAxis('z')" style="color:#7aabff" title="Mirror Z">Z</button>
+    <button class="abtn btn-mirror-apply" onclick="applyMirror()">&#x2713;</button>
+    <div class="sep"></div>
+    <button class="abtn btn-array" onclick="showArrayDialog()">&#x1f522; Array</button>
+    <button class="abtn btn-align" onclick="showAlignDialog()">&#x1f4d0; Align</button>
+    <button class="abtn btn-ruler" id="btn-ruler" onclick="toggleRuler()">&#x1f4cf; Ruler</button>
+    <button class="abtn btn-frame" onclick="frameSelected()">&#x1f50d; Frame</button>
+    <button class="abtn btn-reset-cam" onclick="resetCamera()">&#x1f3e0;</button>
+    <div class="toolbar-spacer"></div>
+    <button class="abtn btn-screenshot" onclick="takeScreenshot()">&#x1f4f7; Screenshot</button>
+    <div class="sep"></div>
+    <button class="abtn btn-stl" onclick="exportSTL()">&#11015; STL</button>
+    <button class="abtn btn-obj" onclick="exportOBJ()">&#11015; OBJ</button>
+    <button class="abtn btn-gltf" onclick="exportGLTF()">&#11015; GLTF</button>
+  </div>
+</div>
+
+<!-- WORKSPACE -->
+<div id="ws">
+
+  <!-- LEFT PANEL — All sections visible, no tabs -->
+  <div class="panel" id="lp">
+    <div class="pcont">
+      <div class="sec-label">Basic Shapes</div>
+      <div class="sgrid">
+        <button class="shbtn" onclick="addShape('box')"><span class="ic">&#x1f7e6;</span>Cube</button>
+        <button class="shbtn" onclick="addShape('sphere')"><span class="ic">&#x1f535;</span>Sphere</button>
+        <button class="shbtn" onclick="addShape('cylinder')"><span class="ic">&#x1fad9;</span>Cylinder</button>
+        <button class="shbtn" onclick="addShape('cone')"><span class="ic">&#x1f53a;</span>Cone</button>
+        <button class="shbtn" onclick="addShape('torus')"><span class="ic">&#x1f369;</span>Torus</button>
+        <button class="shbtn" onclick="addShape('pyramid')"><span class="ic">&#x1f537;</span>Pyramid</button>
+        <button class="shbtn" onclick="addShape('wedge')"><span class="ic">&#x1f4d0;</span>Wedge</button>
+        <button class="shbtn" onclick="addShape('tube')"><span class="ic">&#x1faa3;</span>Tube</button>
+      </div>
+
+      <div class="sec-label">Fun Shapes</div>
+      <div class="sgrid">
+        <button class="shbtn" onclick="addShape('star')"><span class="ic">&#x2b50;</span>Star</button>
+        <button class="shbtn" onclick="addShape('heart')"><span class="ic">&#x2764;&#xfe0f;</span>Heart</button>
+        <button class="shbtn" onclick="addShape('arrow')"><span class="ic">&#x27a1;&#xfe0f;</span>Arrow</button>
+        <button class="shbtn" onclick="addShape('ring')"><span class="ic">&#x1f48d;</span>Ring</button>
+        <button class="shbtn" onclick="addShape('capsule')"><span class="ic">&#x1f48a;</span>Capsule</button>
+        <button class="shbtn" onclick="addShape('halfball')"><span class="ic">&#x26be;</span>Half</button>
+        <button class="shbtn" onclick="addShape('bolt')"><span class="ic">&#x26a1;</span>Bolt</button>
+        <button class="shbtn" onclick="addShape('diamond')"><span class="ic">&#x1f48e;</span>Diamond</button>
+      </div>
+
+      <div class="sec-label">Geometric</div>
+      <div class="sgrid">
+        <button class="shbtn" onclick="addShape('dodecahedron')"><span class="ic">&#x2b23;</span>Dodeca</button>
+        <button class="shbtn" onclick="addShape('icosahedron')"><span class="ic">&#x25c7;</span>Icosa</button>
+        <button class="shbtn" onclick="addShape('octahedron')"><span class="ic">&#x25c6;</span>Octa</button>
+        <button class="shbtn" onclick="addShape('hexagon')"><span class="ic">&#x2b22;</span>Hex</button>
+        <button class="shbtn" onclick="addShape('pentagon')"><span class="ic">&#x2b1f;</span>Pent</button>
+        <button class="shbtn" onclick="addShape('trapezoid')"><span class="ic">&#x25ad;</span>Trap</button>
+        <button class="shbtn" onclick="addShape('prism')"><span class="ic">&#x1f529;</span>Prism</button>
+        <button class="shbtn" onclick="addShape('egg')"><span class="ic">&#x1f95a;</span>Egg</button>
+      </div>
+
+      <div class="sec-label">Advanced</div>
+      <div class="sgrid">
+        <button class="shbtn" onclick="addShape('roundroof')"><span class="ic">&#x1f3db;&#xfe0f;</span>Arch</button>
+        <button class="shbtn" onclick="addShape('paraboloid')"><span class="ic">&#x1f4a7;</span>Parab</button>
+        <button class="shbtn" onclick="addShape('crescent')"><span class="ic">&#x1f319;</span>Moon</button>
+        <button class="shbtn" onclick="addShape('spring')"><span class="ic">&#x1f300;</span>Spring</button>
+        <button class="shbtn" onclick="addShape('gear')"><span class="ic">&#x2699;&#xfe0f;</span>Gear</button>
+      </div>
+
+      <div class="sec-label">&#x1f524; 3D Text</div>
+      <div id="text-tool"></div>
+
+      <div class="sec-label">&#x1f4cc; My Stamps</div>
+      <div class="stamp-actions">
+        <button class="abtn btn-stamp-save" onclick="saveAsStamp()">&#x1f4be; Save Stamp</button>
+      </div>
+      <div id="stamp-list">
+        <div style="font-size:10px;color:var(--dim);padding:4px">No stamps yet. Select a shape and click "Save as Stamp".</div>
+      </div>
+
+      <div class="sec-label">&#x1f3ac; Animation</div>
+      <div class="anim-controls">
+        <div class="anim-row">
+          <button class="abtn btn-anim" onclick="addKeyframe()">&#x1f4cd; Add Key</button>
+          <button class="abtn btn-anim" onclick="removeKeyframe()">&#x1f5d1; Remove</button>
+          <button class="abtn btn-anim" id="btn-anim-play" onclick="toggleAnimPlay()">&#x25b6; Play</button>
+          <button class="abtn btn-anim" onclick="clearAnimation()">&#x1f5d1;</button>
+        </div>
+        <div class="anim-timeline-bar">
+          <input type="range" id="anim-scrub" class="param-slider" min="0" max="3" step="0.05" value="0" oninput="setAnimTime(this.value)" style="width:100%">
+          <div id="anim-markers"></div>
+        </div>
+        <div class="anim-info">
+          <span id="anim-time-display">0.0s / 3.0s</span>
+          <span id="anim-kf-count">0 keyframes</span>
+        </div>
+      </div>
+
+      <div class="sec-label">&#x1f4cb; Scene Objects</div>
+      <div id="scene-tree"></div>
+      <div id="scene-empty" style="display:none">
+        <div class="nt" style="font-size:10px;color:var(--dim);padding:4px">No objects yet</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D VIEWPORT -->
+  <div id="vp">
+    <div id="welcome-overlay" onclick="hideWelcome()">
+      <div class="welcome-box">
+        <div class="welcome-wave">&#x1f44b;</div>
+        <div class="welcome-title">Welcome to Spatio Studio!</div>
+        <div class="welcome-msg">Pick a shape from the left panel<br>to start creating in 3D!</div>
+        <div class="welcome-arrow">&#x2190;</div>
+        <div class="welcome-hint">Click anywhere to begin</div>
+      </div>
+    </div>
+    <div id="modebar">&#10022; SELECT MODE</div>
+    <div id="obj-count">0 objects</div>
+    <canvas id="axwidget"></canvas>
+    <div id="viewcube">
+      <button class="vcbtn" onclick="setCameraView('top')" title="Top">T</button>
+      <div class="vcrow">
+        <button class="vcbtn" onclick="setCameraView('left')" title="Left">L</button>
+        <button class="vcbtn vc-center" onclick="setCameraView('front')" title="Front">F</button>
+        <button class="vcbtn" onclick="setCameraView('right')" title="Right">R</button>
+      </div>
+      <button class="vcbtn" onclick="setCameraView('bottom')" title="Bottom">B</button>
+    </div>
+    <div id="hints">
+      <div class="hbadge">&#x1f5b1; Left drag: Orbit &nbsp;|&nbsp; Right drag: Pan &nbsp;|&nbsp; Scroll: Zoom</div>
+      <div class="hbadge">Arrow keys: Move &nbsp;|&nbsp; Del: Delete &nbsp;|&nbsp; Shift+Click: Multi-select</div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel" id="rp">
+    <div class="ptabs">
+      <button class="ptab active" onclick="swR('props',this)">Properties</button>
+      <button class="ptab" onclick="swR('measure',this)">&#x1f4cf; Measure</button>
+      <button class="ptab" onclick="swR('learn',this)">&#x1f4da; Learn</button>
+    </div>
+    <div class="pcont">
+
+      <!-- PROPERTIES -->
+      <div id="tab-props" class="tc on">
+        <div id="no-sel">
+          <div class="ns">
+            <div class="ni">&#x1f6f8;</div>
+            <div class="nt">Pick a shape from the library on the left to add it to your scene, then click it to select and customize!</div>
+          </div>
+        </div>
+        <div id="has-sel" style="display:none">
+          <div class="ps">
+            <div class="pl">Color</div>
+            <div class="cs" id="swatches"></div>
+            <div class="cs" id="expanded-palette"></div>
+            <div class="cprow">
+              <input type="color" id="cpick" value="#29b6f6" oninput="applyColor(this.value)">
+              <span style="font-size:11px;color:var(--dim)">Custom color</span>
+            </div>
+          </div>
+          <div class="ps">
+            <div class="pl">Material Style</div>
+            <div id="material-presets" class="mat-grid"></div>
+          </div>
+          <div class="ps">
+            <div class="pl">Position</div>
+            <div class="pr"><span class="pa x">X</span><input type="number" class="pi" id="px" step="0.5" oninput="applyXform()"></div>
+            <div class="pr"><span class="pa y">Y</span><input type="number" class="pi" id="py" step="0.5" oninput="applyXform()"></div>
+            <div class="pr"><span class="pa z">Z</span><input type="number" class="pi" id="pz" step="0.5" oninput="applyXform()"></div>
+          </div>
+          <div class="ps">
+            <div class="pl">Rotation (degrees)</div>
+            <div class="pr"><span class="pa x">X</span><input type="number" class="pi" id="rx" step="15" oninput="applyXform()"></div>
+            <div class="pr"><span class="pa y">Y</span><input type="number" class="pi" id="ry" step="15" oninput="applyXform()"></div>
+            <div class="pr"><span class="pa z">Z</span><input type="number" class="pi" id="rz" step="15" oninput="applyXform()"></div>
+          </div>
+          <div class="ps">
+            <div class="pl">Scale</div>
+            <div class="pr"><span class="pa x">X</span><input type="number" class="pi" id="sx" step="0.1" min="0.01" oninput="applyXform()"></div>
+            <div class="pr"><span class="pa y">Y</span><input type="number" class="pi" id="sy" step="0.1" min="0.01" oninput="applyXform()"></div>
+            <div class="pr"><span class="pa z">Z</span><input type="number" class="pi" id="sz" step="0.1" min="0.01" oninput="applyXform()"></div>
+          </div>
+          <div class="ps">
+            <div class="pl">Shape Parameters</div>
+            <div id="param-sliders"></div>
+          </div>
+          <div class="ps">
+            <div class="pl">Mirror / Flip</div>
+            <div class="mirror-btns">
+              <button class="mirbtn mirx" onclick="mirrorX()">&#8596; Flip X</button>
+              <button class="mirbtn miry" onclick="mirrorY()">&#8597; Flip Y</button>
+              <button class="mirbtn mirz" onclick="mirrorZ()">&#x21c5; Flip Z</button>
+            </div>
+          </div>
+          <div class="ps">
+            <div class="pl">Smooth / Subdivide</div>
+            <div class="smooth-btns">
+              <button class="mirbtn" onclick="applySubdivide(1, 0.3)">Slight</button>
+              <button class="mirbtn" onclick="applySubdivide(1, 0.5)">Medium</button>
+              <button class="mirbtn" onclick="applySubdivide(2, 0.5)">Heavy</button>
+              <button class="mirbtn" onclick="resetSubdivide()" style="color:var(--coral)">Reset</button>
+            </div>
+          </div>
+          <button class="dupbtn" onclick="duplicateSelected()">&#10697; Duplicate Shape</button>
+          <button class="delbtn" onclick="deleteSelected()">&#128465; Delete Shape</button>
+        </div>
+      </div>
+
+      <!-- MEASUREMENTS (live on selected object) -->
+      <div id="tab-measure" class="tc">
+        <div id="measurements">
+          <div class="meas-empty">Select a shape to see measurements</div>
+        </div>
+        <div class="sec-label" style="margin-top:10px">&#x2702;&#xfe0f; Cross-Section Viewer</div>
+        <div class="xsection-controls">
+          <button class="abtn btn-xsection" id="btn-xsection" onclick="toggleCrossSection()">&#x2702; Slice View</button>
+          <div class="xsection-row">
+            <span class="param-label">Axis</span>
+            <button class="meas-ubtn xaxis-btn xaxis-btn-x" onclick="setCrossAxis('x')" style="color:#ff8888">X</button>
+            <button class="meas-ubtn xaxis-btn xaxis-btn-y active" onclick="setCrossAxis('y')" style="color:#5eff8a">Y</button>
+            <button class="meas-ubtn xaxis-btn xaxis-btn-z" onclick="setCrossAxis('z')" style="color:#7aabff">Z</button>
+          </div>
+          <div class="param-row">
+            <label class="param-label">Cut Position</label>
+            <input type="range" class="param-slider" min="0" max="1" step="0.02" value="0.5" oninput="setCrossHeight(this.value)">
+          </div>
+        </div>
+        <div id="xsection-info"></div>
+
+        <div class="sec-label" style="margin-top:10px">&#x2696;&#xfe0f; Density &amp; Weight</div>
+        <div id="density-calc">
+          <div class="meas-empty">Select a shape to calculate weight</div>
+        </div>
+      </div>
+
+      <!-- LEARN -->
+      <div id="tab-learn" class="tc">
+
+        <div class="tut-launch-section">
+          <div class="sec-label">&#x1f393; Interactive Lessons</div>
+          <button class="tut-launch-btn" onclick="startTutorial('basics')">&#x1f680; Lesson 1: Your First 3D Shape</button>
+          <button class="tut-launch-btn" onclick="startTutorial('holes')">&#x1f573;&#xfe0f; Lesson 2: Making Holes (CSG)</button>
+          <button class="tut-launch-btn" onclick="startTutorial('export')">&#x1f3a8; Lesson 3: Colors &amp; Exporting</button>
+        </div>
+
+        <div class="tut-launch-section">
+          <div class="sec-label">&#x1f3af; Challenges &amp; Quizzes</div>
+          <button class="tut-launch-btn chal-btn" onclick="startCoordChallenge('easy')">&#x1f4cd; Coordinate Challenge: Easy</button>
+          <button class="tut-launch-btn chal-btn" onclick="startCoordChallenge('medium')">&#x1f4cd; Coordinate Challenge: Medium</button>
+          <button class="tut-launch-btn chal-btn" onclick="startCoordChallenge('hard')">&#x1f4cd; Coordinate Challenge: Hard</button>
+          <button class="tut-launch-btn quiz-btn" onclick="startShapeQuiz('easy')">&#x1f9e0; Shape Quiz: Easy</button>
+          <button class="tut-launch-btn quiz-btn" onclick="startShapeQuiz('medium')">&#x1f9e0; Shape Quiz: Medium</button>
+          <button class="tut-launch-btn quiz-btn" onclick="startShapeQuiz('all')">&#x1f9e0; Shape Quiz: All Questions</button>
+        </div>
+
+        <div class="sec-label" style="margin-top:12px">&#x1f4d6; Reference Guide</div>
+
+        <!-- MEASUREMENTS & UNITS -->
+        <div class="ecard" id="ec-units">
+          <div class="ech" onclick="toggleCard('ec-units')">
+            <span class="ei">&#x1f4cf;</span> Measurements &amp; Units <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>Why Do Units Matter?</h4>
+            <p>When you 3D print something, the printer needs to know <em>exactly</em> how big to make it. A cube that's 2 cm wide is about the size of a dice. A cube that's 2 inches wide is about the size of a marshmallow!</p>
+
+            <h4>Common Units</h4>
+            <div class="factrow">
+              <div class="fact"><strong>mm</strong> (millimeter) &#8212; Width of a pencil tip. 10 mm = 1 cm</div>
+              <div class="fact"><strong>cm</strong> (centimeter) &#8212; Width of your pinky finger. 100 cm = 1 meter</div>
+              <div class="fact"><strong>inch (in)</strong> &#8212; About 2.5 cm. Width of a quarter coin</div>
+              <div class="fact"><strong>foot (ft)</strong> &#8212; 12 inches = 30.48 cm. About the length of a ruler</div>
+            </div>
+
+            <h4>Converting Between Units</h4>
+            <div class="factrow">
+              <div class="fact">1 inch = 25.4 mm = 2.54 cm</div>
+              <div class="fact">1 cm = 10 mm = 0.394 inches</div>
+              <div class="fact">1 foot = 12 inches = 30.48 cm</div>
+              <div class="fact">1 meter = 100 cm = 3.28 feet</div>
+            </div>
+
+            <div class="tipbox">Use the Measure tab to see live dimensions of your selected shape in different units!</div>
+
+            <h4>Fractions of an Inch</h4>
+            <p>In the US, measurements often use fractions instead of decimals:</p>
+            <div class="factrow">
+              <div class="fact">&#189; inch = 0.5 in = 12.7 mm</div>
+              <div class="fact">&#188; inch = 0.25 in = 6.35 mm</div>
+              <div class="fact">&#8539; inch = 0.125 in = 3.175 mm</div>
+              <div class="fact">1/16 inch = 0.0625 in = 1.588 mm</div>
+            </div>
+
+            <h4>Real-World Scale Reference</h4>
+            <div class="factrow">
+              <div class="fact">&#x1f4f1; Phone: ~15 cm &#215; 7 cm &#215; 0.8 cm</div>
+              <div class="fact">&#x26bd; Soccer ball: ~22 cm diameter</div>
+              <div class="fact">&#x1f4d3; Textbook: ~28 cm &#215; 22 cm &#215; 2 cm</div>
+              <div class="fact">&#x1f3b2; Dice: ~1.5 cm &#215; 1.5 cm &#215; 1.5 cm</div>
+              <div class="fact">&#x1f3e0; Door: ~200 cm &#215; 80 cm &#215; 4 cm</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GEOMETRY FORMULAS -->
+        <div class="ecard" id="ec-formulas">
+          <div class="ech" onclick="toggleCard('ec-formulas')">
+            <span class="ei">&#x1f9ee;</span> Geometry Formulas <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>Volume (how much space inside)</h4>
+            <div class="factrow">
+              <div class="fact">&#x1f7e6; <strong>Box:</strong> V = length &#215; width &#215; height</div>
+              <div class="fact">&#x1f535; <strong>Sphere:</strong> V = &#8308;&#8260;&#8323; &#215; &#960; &#215; r&#179;</div>
+              <div class="fact">&#x1fad9; <strong>Cylinder:</strong> V = &#960; &#215; r&#178; &#215; h</div>
+              <div class="fact">&#x1f53a; <strong>Cone:</strong> V = &#8531; &#215; &#960; &#215; r&#178; &#215; h</div>
+              <div class="fact">&#x1f537; <strong>Pyramid:</strong> V = &#8531; &#215; base area &#215; h</div>
+              <div class="fact">&#x1f369; <strong>Torus:</strong> V = 2&#960;&#178; &#215; R &#215; r&#178;</div>
+            </div>
+
+            <h4>Surface Area (outside skin)</h4>
+            <div class="factrow">
+              <div class="fact">&#x1f7e6; <strong>Box:</strong> SA = 2(lw + lh + wh)</div>
+              <div class="fact">&#x1f535; <strong>Sphere:</strong> SA = 4 &#215; &#960; &#215; r&#178;</div>
+              <div class="fact">&#x1fad9; <strong>Cylinder:</strong> SA = 2&#960;r(r + h)</div>
+              <div class="fact">&#x1f53a; <strong>Cone:</strong> SA = &#960;r(r + slant)</div>
+            </div>
+
+            <div class="tipbox">Select any shape and check the Measure tab to see these formulas calculated live!</div>
+
+            <h4>Key Math Symbols</h4>
+            <div class="factrow">
+              <div class="fact"><strong>&#960;</strong> (pi) = 3.14159... &#8212; the magic circle number!</div>
+              <div class="fact"><strong>r</strong> = radius (distance from center to edge)</div>
+              <div class="fact"><strong>r&#178;</strong> = r squared = r &#215; r</div>
+              <div class="fact"><strong>r&#179;</strong> = r cubed = r &#215; r &#215; r</div>
+              <div class="fact"><strong>h</strong> = height</div>
+            </div>
+
+            <h4>Perimeter &amp; Circumference</h4>
+            <div class="factrow">
+              <div class="fact"><strong>Square:</strong> P = 4 &#215; side</div>
+              <div class="fact"><strong>Rectangle:</strong> P = 2(l + w)</div>
+              <div class="fact"><strong>Circle:</strong> C = 2 &#215; &#960; &#215; r = &#960; &#215; d</div>
+              <div class="fact"><strong>Triangle:</strong> P = a + b + c</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ANGLES & ROTATION -->
+        <div class="ecard" id="ec-angles">
+          <div class="ech" onclick="toggleCard('ec-angles')">
+            <span class="ei">&#x1f4d0;</span> Angles &amp; Rotation <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>What Are Degrees?</h4>
+            <p>A full spin = <strong>360&#176;</strong>. Half turn = 180&#176;. Quarter turn = 90&#176;. These numbers show up everywhere in 3D!</p>
+
+            <h4>Common Angles</h4>
+            <div class="factrow">
+              <div class="fact"><strong>0&#176;</strong> &#8212; No rotation (facing forward)</div>
+              <div class="fact"><strong>45&#176;</strong> &#8212; Half of a right angle (diagonal)</div>
+              <div class="fact"><strong>90&#176;</strong> &#8212; Right angle (&#x1f4d0; corner of a book)</div>
+              <div class="fact"><strong>180&#176;</strong> &#8212; Half turn (facing backward)</div>
+              <div class="fact"><strong>270&#176;</strong> &#8212; Three-quarter turn</div>
+              <div class="fact"><strong>360&#176;</strong> &#8212; Full rotation (back to start!)</div>
+            </div>
+
+            <h4>Rotation Axes (how things spin)</h4>
+            <div class="axrow">
+              <span class="axchip x">X axis</span>
+              <span class="axchip y">Y axis</span>
+              <span class="axchip z">Z axis</span>
+            </div>
+            <p><strong style="color:#ff8888">X rotation</strong> = tilt forward/backward (like nodding)</p>
+            <p><strong style="color:#5eff8a">Y rotation</strong> = spin left/right (like shaking head "no")</p>
+            <p><strong style="color:#7aabff">Z rotation</strong> = roll sideways (like tilting head)</p>
+
+            <div class="tipbox">In Spatio, rotation snaps to 15&#176; by default. Hold Shift for finer 5&#176; rotation!</div>
+
+            <h4>Symmetry</h4>
+            <p><strong>Symmetry</strong> = when both halves match. Use the Mirror/Flip buttons to test symmetry!</p>
+            <div class="factrow">
+              <div class="fact">&#x1f535; Sphere &#8212; infinite lines of symmetry</div>
+              <div class="fact">&#x1f7e6; Cube &#8212; 9 planes of symmetry</div>
+              <div class="fact">&#x2b50; 5-point star &#8212; 5 lines of symmetry</div>
+              <div class="fact">&#x2764;&#xfe0f; Heart &#8212; 1 line of symmetry</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SCALE & PROPORTION -->
+        <div class="ecard" id="ec-scale">
+          <div class="ech" onclick="toggleCard('ec-scale')">
+            <span class="ei">&#x1f50d;</span> Scale &amp; Proportion <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>What Is Scale?</h4>
+            <p>Scale means making something bigger or smaller while keeping the same <em>shape</em>. A model car is a "scaled down" version of a real car!</p>
+
+            <h4>Scale Factors</h4>
+            <div class="factrow">
+              <div class="fact"><strong>2x</strong> scale = double the size (8x the volume!)</div>
+              <div class="fact"><strong>0.5x</strong> scale = half the size (&#8539; the volume)</div>
+              <div class="fact"><strong>1x</strong> scale = same size (no change)</div>
+            </div>
+
+            <div class="tipbox">When you double all dimensions (2x), the volume becomes 2 &#215; 2 &#215; 2 = <strong>8 times</strong> bigger! That's why elephants need such thick legs.</div>
+
+            <h4>Uniform vs Non-Uniform Scale</h4>
+            <p><strong>Uniform</strong>: Scale X, Y, Z equally &#8212; keeps proportions</p>
+            <p><strong>Non-uniform</strong>: Scale each axis differently &#8212; stretches or squishes</p>
+
+            <h4>Aspect Ratio</h4>
+            <p>The relationship between width and height. A square has <strong>1:1</strong> ratio. A widescreen TV is <strong>16:9</strong>. A phone is about <strong>9:19</strong>.</p>
+          </div>
+        </div>
+
+        <!-- VOLUME IN ACTION — Cup Example -->
+        <div class="ecard" id="ec-volume-ex">
+          <div class="ech" onclick="toggleCard('ec-volume-ex')">
+            <span class="ei">&#x2615;</span> Volume in Action: The Cup Challenge <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>&#x1f3eb; Teacher Activity: How Much Water Fits?</h4>
+            <p>Have students model a cup in Spatio Studio, then calculate how much water it can hold!</p>
+
+            <h4>Step 1: Model a Cup</h4>
+            <p>A simple cup is a <strong>cylinder</strong>. A real coffee mug is about:</p>
+            <div class="factrow">
+              <div class="fact">Diameter: 8 cm (radius = 4 cm)</div>
+              <div class="fact">Height: 10 cm</div>
+            </div>
+
+            <h4>Step 2: Calculate the Volume</h4>
+            <div class="edu-formula-box">
+              <div class="edu-formula">V = &#960; &#215; r&#178; &#215; h</div>
+              <div class="edu-formula">V = 3.14159 &#215; 4&#178; &#215; 10</div>
+              <div class="edu-formula">V = 3.14159 &#215; 16 &#215; 10</div>
+              <div class="edu-formula-result">V = 502.65 cm&#179;</div>
+            </div>
+
+            <h4>Step 3: Convert to Milliliters</h4>
+            <div class="tipbox">1 cm&#179; = 1 mL (milliliter). So our cup holds about <strong>503 mL</strong> &#8212; that's about 2 cups of water!</div>
+
+            <h4>&#x1f4a1; Class Discussion</h4>
+            <ul>
+              <li>What happens if you make the cup taller but thinner? Does it hold more or less?</li>
+              <li>How wide would a cup need to be to hold exactly 1 liter (1000 mL)?</li>
+              <li>A bathtub holds ~300 liters. How many cups is that?</li>
+            </ul>
+
+            <h4>Challenge: The Cone Cup</h4>
+            <p>Paper cups from water coolers are <strong>cone-shaped</strong>! A cone holds <strong>&#8531; the volume</strong> of a cylinder with the same radius and height.</p>
+            <div class="edu-formula-box">
+              <div class="edu-formula">V<sub>cone</sub> = &#8531; &#215; &#960; &#215; r&#178; &#215; h</div>
+              <div class="edu-formula">V<sub>cone</sub> = &#8531; &#215; 502.65</div>
+              <div class="edu-formula-result">V<sub>cone</sub> = 167.55 mL &#8212; much less!</div>
+            </div>
+
+            <h4>Real-World Connection</h4>
+            <div class="factrow">
+              <div class="fact">&#x2615; Coffee mug &#8776; 350 mL (12 oz)</div>
+              <div class="fact">&#x1f964; Soda can &#8776; 355 mL (12 oz)</div>
+              <div class="fact">&#x1f95b; Milk carton &#8776; 236 mL (8 oz = 1 cup)</div>
+              <div class="fact">&#x1f3ca; Olympic pool &#8776; 2,500,000 liters!</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SURFACE AREA IN ACTION -->
+        <div class="ecard" id="ec-surface-ex">
+          <div class="ech" onclick="toggleCard('ec-surface-ex')">
+            <span class="ei">&#x1f381;</span> Surface Area: Wrapping Paper Challenge <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>&#x1f3eb; Teacher Activity: How Much Wrapping Paper?</h4>
+            <p>Students model a gift box and calculate how much wrapping paper they need!</p>
+
+            <h4>The Gift Box</h4>
+            <p>A shoebox is about: <strong>30 cm &#215; 18 cm &#215; 10 cm</strong></p>
+
+            <h4>Calculate Surface Area</h4>
+            <div class="edu-formula-box">
+              <div class="edu-formula">SA = 2(lw + lh + wh)</div>
+              <div class="edu-formula">SA = 2(30&#215;18 + 30&#215;10 + 18&#215;10)</div>
+              <div class="edu-formula">SA = 2(540 + 300 + 180)</div>
+              <div class="edu-formula">SA = 2 &#215; 1020</div>
+              <div class="edu-formula-result">SA = 2,040 cm&#178; of wrapping paper</div>
+            </div>
+
+            <div class="tipbox">That's about 0.2 m&#178;. A standard roll of wrapping paper is 5 m&#178;, so you could wrap about 25 shoeboxes with one roll!</div>
+
+            <h4>Wrapping a Ball (Sphere)</h4>
+            <p>Wrapping a basketball (diameter 24 cm, radius 12 cm):</p>
+            <div class="edu-formula-box">
+              <div class="edu-formula">SA = 4 &#215; &#960; &#215; r&#178;</div>
+              <div class="edu-formula">SA = 4 &#215; 3.14159 &#215; 12&#178;</div>
+              <div class="edu-formula-result">SA = 1,809.6 cm&#178;</div>
+            </div>
+            <p>That's actually <em>less</em> than the shoebox! But try wrapping a ball smoothly... &#x1f605;</p>
+
+            <h4>&#x1f3d7;&#xfe0f; Real-World: Painting a Room</h4>
+            <p>Painters calculate surface area to know how much paint to buy:</p>
+            <div class="factrow">
+              <div class="fact">Room: 4m &#215; 5m &#215; 2.5m tall</div>
+              <div class="fact">Wall area: 2(4&#215;2.5 + 5&#215;2.5) = 45 m&#178;</div>
+              <div class="fact">1 gallon of paint covers ~35 m&#178;</div>
+              <div class="fact">You'd need about 1.3 gallons (buy 2!)</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PYTHAGOREAN THEOREM -->
+        <div class="ecard" id="ec-pythag">
+          <div class="ech" onclick="toggleCard('ec-pythag')">
+            <span class="ei">&#x1f4d0;</span> Pythagorean Theorem in 3D <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>The Most Famous Formula in Math!</h4>
+            <div class="edu-formula-box">
+              <div class="edu-formula-result">a&#178; + b&#178; = c&#178;</div>
+            </div>
+            <p>In any <strong>right triangle</strong>, the square of the longest side (hypotenuse) equals the sum of the squares of the other two sides.</p>
+
+            <h4>&#x1f3eb; Teacher Activity: The Ramp</h4>
+            <p>Students build a ramp (wedge shape) and calculate its slope length!</p>
+            <div class="factrow">
+              <div class="fact">Base (a): 4 cm (ground length)</div>
+              <div class="fact">Height (b): 3 cm (how tall)</div>
+              <div class="fact">Slope (c): ? cm (the ramp surface)</div>
+            </div>
+            <div class="edu-formula-box">
+              <div class="edu-formula">c&#178; = a&#178; + b&#178;</div>
+              <div class="edu-formula">c&#178; = 4&#178; + 3&#178;</div>
+              <div class="edu-formula">c&#178; = 16 + 9 = 25</div>
+              <div class="edu-formula">c = &#8730;25</div>
+              <div class="edu-formula-result">c = 5 cm &#8212; The famous 3-4-5 triangle!</div>
+            </div>
+
+            <h4>Pythagorean Triples (whole number answers)</h4>
+            <div class="factrow">
+              <div class="fact"><strong>3, 4, 5</strong> &#8212; The classic! (3&#178;+4&#178; = 9+16 = 25 = 5&#178;)</div>
+              <div class="fact"><strong>5, 12, 13</strong> &#8212; (25+144 = 169 = 13&#178;)</div>
+              <div class="fact"><strong>8, 15, 17</strong> &#8212; (64+225 = 289 = 17&#178;)</div>
+              <div class="fact"><strong>7, 24, 25</strong> &#8212; (49+576 = 625 = 25&#178;)</div>
+            </div>
+
+            <h4>3D Diagonal &#8212; Pythagorean Theorem Extended!</h4>
+            <p>To find the diagonal <em>through</em> a box (corner to opposite corner):</p>
+            <div class="edu-formula-box">
+              <div class="edu-formula">d = &#8730;(l&#178; + w&#178; + h&#178;)</div>
+            </div>
+            <p>Example: A box that's <strong>3 &#215; 4 &#215; 12</strong> cm:</p>
+            <div class="edu-formula-box">
+              <div class="edu-formula">d = &#8730;(9 + 16 + 144) = &#8730;169</div>
+              <div class="edu-formula-result">d = 13 cm</div>
+            </div>
+
+            <div class="tipbox">Build a 3&#215;4&#215;12 box in Spatio and measure it! The diagonal from one corner to the opposite corner is exactly 13 cm.</div>
+
+            <h4>&#x1f3eb; Classroom Challenges</h4>
+            <ul>
+              <li><strong>TV Size:</strong> A 55" TV is measured diagonally. If it's 48" wide, how tall is the screen? (Answer: &#8730;(55&#178; - 48&#178;) = &#8730;721 &#8776; 26.8")</li>
+              <li><strong>Ladder Safety:</strong> A 5m ladder leans against a wall, with its base 3m from the wall. How high does it reach? (Answer: 4m)</li>
+              <li><strong>Baseball Diamond:</strong> The bases are 90 feet apart. How far is it from home plate to second base? (Answer: 90&#8730;2 &#8776; 127.3 ft)</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MATH IN 3D PRINTING -->
+        <div class="ecard" id="ec-mathprint">
+          <div class="ech" onclick="toggleCard('ec-mathprint')">
+            <span class="ei">&#x1f5a8;&#xfe0f;</span> Math Meets 3D Printing <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>&#x1f3eb; Teacher Activity: Print Cost Calculator</h4>
+            <p>How much does it cost to 3D print something? It depends on <strong>volume</strong>!</p>
+
+            <h4>Step 1: Calculate Volume</h4>
+            <p>Let's say you designed a cube pencil holder: 8 &#215; 8 &#215; 10 cm with 15% infill.</p>
+            <div class="edu-formula-box">
+              <div class="edu-formula">Total volume = 8 &#215; 8 &#215; 10 = 640 cm&#179;</div>
+              <div class="edu-formula">Actual plastic (15% infill) = 640 &#215; 0.15</div>
+              <div class="edu-formula-result">Plastic used &#8776; 96 cm&#179;</div>
+            </div>
+
+            <h4>Step 2: Convert to Weight</h4>
+            <div class="factrow">
+              <div class="fact">PLA density = 1.24 g/cm&#179;</div>
+              <div class="fact">Weight = 96 &#215; 1.24 = <strong>119 grams</strong></div>
+            </div>
+
+            <h4>Step 3: Calculate Cost</h4>
+            <div class="factrow">
+              <div class="fact">PLA filament: ~$20 per 1 kg spool</div>
+              <div class="fact">Cost = 119g &#215; ($20 / 1000g)</div>
+              <div class="fact"><strong>Cost &#8776; $2.38</strong> to print!</div>
+            </div>
+
+            <div class="tipbox">Most classroom prints cost between $0.50 and $5.00. The biggest cost factor is size &#8212; double the dimensions = 8x the material!</div>
+
+            <h4>Print Time Estimation</h4>
+            <div class="factrow">
+              <div class="fact">Average speed: ~50 mm/second</div>
+              <div class="fact">Our pencil holder: ~2.5 hours</div>
+              <div class="fact">A phone case: ~1.5 hours</div>
+              <div class="fact">A chess piece: ~45 minutes</div>
+            </div>
+
+            <h4>&#x1f4a1; Cross-Curricular Connections</h4>
+            <ul>
+              <li><strong>Math:</strong> Volume, surface area, unit conversion, percentages (infill)</li>
+              <li><strong>Science:</strong> Material properties, density, melting points</li>
+              <li><strong>Art:</strong> Design, proportion, aesthetics</li>
+              <li><strong>Engineering:</strong> Structural integrity, support design, tolerances</li>
+              <li><strong>Economics:</strong> Cost analysis, material efficiency, production planning</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="ecard" id="ec-space">
+          <div class="ech" onclick="toggleCard('ec-space')">
+            <span class="ei">&#x1f310;</span> Spatial Concepts <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>What Is 3D Space?</h4>
+            <p>We live in a 3-dimensional world! Every location has three coordinates &#8212; like a secret address in space.</p>
+            <div class="axrow">
+              <span class="axchip x">X axis</span>
+              <span class="axchip y">Y axis</span>
+              <span class="axchip z">Z axis</span>
+            </div>
+            <p><strong style="color:#ff8888">X</strong> = Left &#8596; Right &nbsp; <strong style="color:#5eff8a">Y</strong> = Up &#8597; Down &nbsp; <strong style="color:#7aabff">Z</strong> = Forward &#8596; Back</p>
+
+            <h4>Coordinates</h4>
+            <p>Every point is written as <strong>(X, Y, Z)</strong>. The center is <strong>(0, 0, 0)</strong> &#8212; called the <em>Origin</em>. The grid you see is centered there!</p>
+
+            <h4>Transformations</h4>
+            <ul>
+              <li><strong>Translation</strong> &#8212; Moving an object</li>
+              <li><strong>Rotation</strong> &#8212; Spinning around an axis</li>
+              <li><strong>Scale</strong> &#8212; Making bigger or smaller</li>
+            </ul>
+            <div class="tipbox">Place a cube at (3, 0, 3). That's 3 right and 3 forward from center!</div>
+
+            <h4>Perspective &amp; Views</h4>
+            <p>Orbit around your scene (drag) to see it from all angles. Real designers check Front, Side, and Top views to make sure everything looks right!</p>
+
+            <h4>Object Origin</h4>
+            <p>Each object has its own origin &#8212; the center point it rotates and scales around. That small point is like the object's "belly button"!</p>
+          </div>
+        </div>
+
+        <div class="ecard" id="ec-geo">
+          <div class="ech" onclick="toggleCard('ec-geo')">
+            <span class="ei">&#x1f4d0;</span> Geometry Basics <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>Building Blocks of 3D Shapes</h4>
+            <ul>
+              <li><strong>Vertex</strong> &#8212; A single point (a corner)</li>
+              <li><strong>Edge</strong> &#8212; A line connecting two vertices</li>
+              <li><strong>Face</strong> &#8212; A flat surface bounded by edges</li>
+              <li><strong>Mesh</strong> &#8212; All the faces making a 3D shape</li>
+            </ul>
+
+            <h4>Shape Facts</h4>
+            <div class="factrow">
+              <div class="fact">&#x1f7e6; Cube &#8212; 8 vertices, 12 edges, 6 faces</div>
+              <div class="fact">&#x1f53a; Pyramid &#8212; 5 vertices, 8 edges, 5 faces</div>
+              <div class="fact">&#x1fad9; Cylinder &#8212; 2 circular faces + 1 curved face</div>
+              <div class="fact">&#x1f535; Sphere &#8212; ~500+ triangular faces!</div>
+            </div>
+
+            <h4>Why Triangles?</h4>
+            <p>All 3D models are made of <em>triangles</em> (called polygons). Triangles are always flat &#8212; you can't make a wonky triangle! Computers love them.</p>
+            <div class="tipbox">A sphere on a computer isn't really round &#8212; it's hundreds of tiny triangles shaped to look round!</div>
+
+            <h4>Volume &amp; Surface Area</h4>
+            <p><strong>Volume</strong> = how much space a shape fills (like water in a cup). <strong>Surface Area</strong> = the total area of all faces added together.</p>
+            <p>Cube formula: Volume = side&#179; &nbsp;|&nbsp; Surface = 6 &#215; side&#178;</p>
+
+            <h4>Symmetry</h4>
+            <p>A shape has symmetry when you can cut it in half and both sides match. A sphere has <em>infinite</em> symmetry. A cube has 9 planes of symmetry!</p>
+
+            <h4>Convex vs Concave</h4>
+            <p>A <strong>convex</strong> shape has no dents (like a ball). A <strong>concave</strong> shape dents inward (like a bowl). Stars are concave!</p>
+          </div>
+        </div>
+
+        <div class="ecard" id="ec-print">
+          <div class="ech" onclick="toggleCard('ec-print')">
+            <span class="ei">&#x1f5a8;&#xfe0f;</span> 3D Printing Guide <span class="ev">&#9660;</span>
+          </div>
+          <div class="ecb">
+            <h4>How Does 3D Printing Work?</h4>
+            <p>A 3D printer builds objects <em>layer by layer from the bottom up</em> &#8212; like stacking thousands of paper-thin sheets to build a tower!</p>
+
+            <h4>Types of 3D Printers</h4>
+            <ul>
+              <li><strong>FDM</strong> &#8212; Melts plastic into thin strands. Most common &amp; beginner-friendly!</li>
+              <li><strong>Resin (SLA)</strong> &#8212; UV light hardens liquid resin. Very detailed but messy.</li>
+              <li><strong>SLS</strong> &#8212; Laser fuses powder together. Used in factories.</li>
+            </ul>
+
+            <h4>Common Materials</h4>
+            <ul>
+              <li><strong>PLA</strong> &#x2b50; &#8212; Easy to print, made from plants! Great for beginners</li>
+              <li><strong>PETG</strong> &#8212; Stronger &amp; a bit flexible. Good for functional parts</li>
+              <li><strong>ABS</strong> &#8212; Very tough but tricky. Used in car parts</li>
+              <li><strong>TPU</strong> &#8212; Flexible like rubber. Perfect for phone cases!</li>
+            </ul>
+
+            <h4>Key Settings in a Slicer</h4>
+            <ul>
+              <li><strong>Layer Height</strong> &#8212; Thinner = smoother but slower (0.1&#8211;0.3 mm)</li>
+              <li><strong>Infill %</strong> &#8212; How solid the inside is. 15% = mostly hollow. 100% = solid</li>
+              <li><strong>Supports</strong> &#8212; Temporary columns holding up steep overhangs</li>
+              <li><strong>Print Speed</strong> &#8212; Slower = better quality</li>
+            </ul>
+
+            <div class="tipbox">Overhangs steeper than 45&#176; usually need supports. Design flat-bottomed models to skip them and save time!</div>
+
+            <h4>From Screen to Reality</h4>
+            <p><strong>Step 1</strong> &#8212; Design in Spatio Studio and export STL</p>
+            <p><strong>Step 2</strong> &#8212; Open STL in a Slicer (Cura, PrusaSlicer, Bambu)</p>
+            <p><strong>Step 3</strong> &#8212; Slicer creates G-code instructions for the printer</p>
+            <p><strong>Step 4</strong> &#8212; Printer builds it layer by layer &#x1f389;</p>
+
+            <h4>Design Tips for 3D Printing</h4>
+            <ul>
+              <li>Flat surfaces print best &#8212; avoid unsupported ceilings</li>
+              <li>Minimum wall thickness: 1.2 mm (2&#215; nozzle width)</li>
+              <li>Make sure your model has NO holes (watertight)</li>
+              <li>Add a flat base so your model sticks to the print bed</li>
+              <li>Export as <strong>.STL</strong> for most printers</li>
+            </ul>
+
+            <h4>Troubleshooting Tips</h4>
+            <ul>
+              <li>Print not sticking? Clean the bed &amp; add a brim</li>
+              <li>Stringy between parts? Lower temperature or increase retraction</li>
+              <li>Layer separation? Increase temperature or slow down</li>
+              <li>Warping? Use an enclosure or heated bed</li>
+            </ul>
+          </div>
+        </div>
+
+      </div><!-- /tab-learn -->
+
+    </div>
+  </div><!-- /rp -->
+
+</div><!-- /ws -->
+
+<!-- Application Scripts (order matters) -->
+<script src="js/spatio-modal.js"></script>
+<script src="js/spatio-core.js"></script>
+<script src="js/spatio-shapes.js"></script>
+<script src="js/spatio-interaction.js"></script>
+<script src="js/spatio-properties.js"></script>
+<script src="js/font-helvetiker-bold.js"></script>
+<script src="js/font-helvetiker.js"></script>
+<script src="js/font-optimer-bold.js"></script>
+<script src="js/font-optimer.js"></script>
+<script src="js/spatio-text.js"></script>
+<script src="js/spatio-params.js"></script>
+<script src="js/spatio-csg.js"></script>
+<script src="js/spatio-io.js"></script>
+<script src="js/spatio-ui.js"></script>
+<script src="js/spatio-education.js"></script>
+<script src="js/spatio-challenges.js"></script>
+<script src="js/spatio-crosssection.js"></script>
+<script src="js/spatio-mirror.js"></script>
+<script src="js/spatio-subdivide.js"></script>
+<script src="js/spatio-array.js"></script>
+<script src="js/spatio-materials.js"></script>
+<script src="js/spatio-ruler.js"></script>
+<script src="js/spatio-align.js"></script>
+<script src="js/SVGLoader.js"></script>
+<script src="js/spatio-svgimport.js"></script>
+<script src="js/spatio-animate.js"></script>
+<script src="js/spatio-paint.js"></script>
+<script src="js/spatio-stamps.js"></script>
+<script src="js/spatio-tutorials.js"></script>
+<script src="js/spatio-app.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,63 @@
+# IDE and Editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+
+# Build outputs
+target/
+build/
+dist/
+out/
+*.class
+*.jar
+*.war
+*.ear
+dependency-reduced-pom.xml
+hs_err_pid*.log
+
+# Package files
+node_modules/
+package-lock.json
+yarn.lock
+
+# Database files
+*.db
+*.mv.db
+*.trace.db
+data/
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+
+# Temporary files
+*.tmp
+*.temp
+nul
+
+# Backups
+*.zip
+*.backup
+old-data/
+*-Backup-*/
+
+# Claude AI
+.claude/
