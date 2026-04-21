@@ -3,7 +3,7 @@
 ## What it is
 
 Spatio Studio is a free 3D modeling studio for young creators, ages 6 to 14.
-It is a desktop application that lets kids build, paint, animate, and export
+It is a desktop application that lets kids build, paint, and export
 3D models. It is designed to be used in classrooms, computer labs, homes,
 and libraries.
 

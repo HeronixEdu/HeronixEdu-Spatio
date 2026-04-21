@@ -173,24 +173,6 @@ window.onerror = function(msg, url, line, col, err) {
         <div style="font-size:10px;color:var(--dim);padding:4px">No stamps yet. Select a shape and click "Save as Stamp".</div>
       </div>
 
-      <div class="sec-label">&#x1f3ac; Animation</div>
-      <div class="anim-controls">
-        <div class="anim-row">
-          <button class="abtn btn-anim" onclick="addKeyframe()">&#x1f4cd; Add Key</button>
-          <button class="abtn btn-anim" onclick="removeKeyframe()">&#x1f5d1; Remove</button>
-          <button class="abtn btn-anim" id="btn-anim-play" onclick="toggleAnimPlay()">&#x25b6; Play</button>
-          <button class="abtn btn-anim" onclick="clearAnimation()">&#x1f5d1;</button>
-        </div>
-        <div class="anim-timeline-bar">
-          <input type="range" id="anim-scrub" class="param-slider" min="0" max="3" step="0.05" value="0" oninput="setAnimTime(this.value)" style="width:100%">
-          <div id="anim-markers"></div>
-        </div>
-        <div class="anim-info">
-          <span id="anim-time-display">0.0s / 3.0s</span>
-          <span id="anim-kf-count">0 keyframes</span>
-        </div>
-      </div>
-
       <div class="sec-label">&#x1f4cb; Scene Objects</div>
       <div id="scene-tree"></div>
       <div id="scene-empty" style="display:none">
@@ -877,7 +859,6 @@ window.onerror = function(msg, url, line, col, err) {
 <script src="js/spatio-align.js"></script>
 <script src="js/SVGLoader.js"></script>
 <script src="js/spatio-svgimport.js"></script>
-<script src="js/spatio-animate.js"></script>
 <script src="js/spatio-paint.js"></script>
 <script src="js/spatio-stamps.js"></script>
 <script src="js/spatio-tutorials.js"></script>

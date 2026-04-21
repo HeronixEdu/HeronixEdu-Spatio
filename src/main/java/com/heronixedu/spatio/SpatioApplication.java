@@ -82,7 +82,13 @@ public class SpatioApplication {
             settings.log_severity = CefSettings.LogSeverity.LOGSEVERITY_WARNING;
             settings.remote_debugging_port = 0; // SECURITY: Disable DevTools
             // Disable every Chromium feature that reaches the network or phones home.
-            builder.addJcefArgs("--no-sandbox");
+            // NOTE: --no-sandbox was previously set as a convenience flag for
+            // JCEF setup on Windows. Removed because leaving the sandbox on
+            // means an RCE in a renderer (malicious SVG / font / glyph parse)
+            // stays contained in a restricted child process instead of getting
+            // JVM-host-level access. If jcefmaven reports a sandbox init
+            // failure, put --no-sandbox back and file an upstream issue —
+            // don't silently disable it.
             builder.addJcefArgs("--disable-extensions");
             builder.addJcefArgs("--disable-component-update");
             builder.addJcefArgs("--disable-background-networking");
@@ -282,16 +288,22 @@ public class SpatioApplication {
     }
 
     /**
-     * Local-only schemes. file:// is our runtime resource dir; data: and blob:
-     * are in-memory (no network); about: and chrome-devtools: are Chromium
-     * internal (DevTools are disabled anyway, but allow the scheme so it can
-     * 404 cleanly rather than triggering a red "blocked" log line).
+     * Local-only schemes allowed through the request handler.
+     * - file:// — our runtime resource dir.
+     * - about: — Chromium internal (about:blank etc.).
+     * - chrome-devtools: — DevTools are disabled, but let the scheme pass
+     *   so it 404s cleanly instead of producing a noisy BLOCKED log line.
+     *
+     * data: and blob: are intentionally NOT allowed. The app's only uses of
+     * toDataURL / createObjectURL either pass the string over the Java bridge
+     * (canvas screenshots, GLTF texture export) or are browser-fallback code
+     * paths that are never reached when the Java bridge is present. Keeping
+     * them out of the allowlist tightens the lockdown without breaking any
+     * real code path.
      */
     private static boolean isLocalUrl(String url) {
         if (url == null) return false;
         return url.startsWith("file://")
-            || url.startsWith("data:")
-            || url.startsWith("blob:")
             || url.startsWith("about:")
             || url.startsWith("chrome-devtools:");
     }
@@ -343,7 +355,6 @@ public class SpatioApplication {
             "js/spatio-align.js",
             "js/SVGLoader.js",
             "js/spatio-svgimport.js",
-            "js/spatio-animate.js",
             "js/spatio-paint.js",
             "js/spatio-stamps.js",
             "js/spatio-tutorials.js",

@@ -17,16 +17,6 @@ function disposeObject(obj3d) {
 // ═══════════════════════════════════════════
 function deleteSelected() {
   if (!selectedRoot) return;
-  // Stop animation if playing to prevent accessing deleted objects
-  if (typeof animPlaying !== 'undefined' && animPlaying) {
-    animPlaying = false;
-    if (typeof animFrameId !== 'undefined' && animFrameId) {
-      cancelAnimationFrame(animFrameId);
-      animFrameId = null;
-    }
-    var playBtn = document.getElementById('btn-anim-play');
-    if (playBtn) playBtn.textContent = '▶ Play';
-  }
   saveUndo();
   // Don't dispose — undo may restore this object. Disposal happens on undo stack eviction.
   scene.remove(selectedRoot);
@@ -154,13 +144,6 @@ function clearScene() {
     if (typeof removeAllMirrorClones === 'function') removeAllMirrorClones();
     if (typeof clearRulerLines === 'function') clearRulerLines();
     if (typeof crossSectionEnabled !== 'undefined' && crossSectionEnabled) toggleCrossSection();
-    if (typeof animPlaying !== 'undefined' && animPlaying) {
-      animPlaying = false;
-      if (typeof animFrameId !== 'undefined' && animFrameId) {
-        cancelAnimationFrame(animFrameId);
-        animFrameId = null;
-      }
-    }
     document.getElementById('no-sel').style.display='block';
     document.getElementById('has-sel').style.display='none';
     updateObjCount();

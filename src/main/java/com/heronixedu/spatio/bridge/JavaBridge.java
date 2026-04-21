@@ -98,6 +98,12 @@ public class JavaBridge {
                             callback.failure(-1, "File access denied");
                             return true;
                         }
+                        // SECURITY: single-use token — remove as soon as we've
+                        // matched it. The JS flow is always dialog → one
+                        // readFile, so we don't need to keep the entry around;
+                        // removing it prevents the allowlist from growing for
+                        // the life of the process and also prevents replay.
+                        allowedReadPaths.remove(canonical);
                         // SECURITY: Check file extension
                         String ext = getExtension(canonical);
                         if (!ALLOWED_READ_EXTENSIONS.contains(ext)) {

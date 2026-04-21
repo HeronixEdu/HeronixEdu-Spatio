@@ -35,7 +35,6 @@ function saveProject() {
       };
     }),
     stamps: (typeof stampLibrary !== 'undefined') ? stampLibrary : [],
-    animation: (typeof animTimeline !== 'undefined') ? animTimeline : [],
   };
 
   var json = JSON.stringify(project, null, 2);
@@ -185,12 +184,8 @@ function doLoadProject(jsonStr) {
       stampLibrary = project.stamps;
       if (typeof updateStampUI === 'function') updateStampUI();
     }
-
-    // Restore animation if saved
-    if (project.animation && project.animation.length > 0 && typeof animTimeline !== 'undefined') {
-      animTimeline = project.animation;
-      if (typeof updateAnimUI === 'function') updateAnimUI();
-    }
+    // project.animation from older files is silently ignored — animation
+    // support was removed.
 
     deselect();
     updateObjCount();

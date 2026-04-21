@@ -86,16 +86,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--fb);height:100vh;o
 .stamp-del{background:none;border:none;color:var(--dim);font-size:14px;cursor:pointer;width:20px;height:20px;line-height:1}
 .stamp-del:hover{color:var(--coral)}
 
-/* ── ANIMATION ── */
-.anim-controls{margin-bottom:8px}
-.anim-row{display:flex;gap:3px;margin-bottom:4px}
-.btn-anim{flex:1;font-size:9px;padding:4px 2px;background:var(--p2);color:var(--text);border:1px solid var(--border)}
-.btn-anim:hover{background:var(--p3)}
-.anim-timeline-bar{position:relative;margin-bottom:4px}
-#anim-markers{position:absolute;top:0;left:0;right:0;height:100%;pointer-events:none}
-.anim-marker{position:absolute;top:50%;width:6px;height:6px;background:var(--gold);border-radius:50%;transform:translate(-50%,-50%)}
-.anim-info{display:flex;justify-content:space-between;font-size:9px;color:var(--dim);font-weight:800}
-
 /* ── CUSTOM MODAL ── */
 #modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:99990;background:rgba(0,0,0,0);align-items:center;justify-content:center;transition:background 0.25s ease}
 #modal-overlay.modal-visible{background:rgba(0,0,0,0.6)}

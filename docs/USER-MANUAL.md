@@ -163,30 +163,7 @@ it again to reset.
 
 ---
 
-## 8. Animation timeline
-
-The animation timeline lets you record keyframes and play them back.
-
-1. Arrange your scene the way you want it to start.
-2. Click **+ Keyframe** to store the current positions, rotations, and
-   scales at time 0.
-3. Move to a new time (drag the scrubber). Move, rotate, or scale your
-   objects.
-4. Click **+ Keyframe** again to record a new keyframe at the new time.
-5. Repeat as needed.
-6. Click **Play**. The app smoothly interpolates between keyframes.
-
-The duration slider sets how long the animation runs. Keyframes loop
-when the time reaches the end.
-
-**Remove Keyframe** deletes the keyframe closest to the current time.
-**Clear** wipes all keyframes.
-
-Deleting objects while an animation is playing pauses it automatically.
-
----
-
-## 9. 3D Text
+## 8. 3D Text
 
 In the left panel's text tool:
 
@@ -205,7 +182,7 @@ object. Useful for spelling out words.
 
 ---
 
-## 10. SVG import
+## 9. SVG import
 
 Draw a logo or shape in any 2D program, save it as `.svg`, and import
 it as a 3D extrusion.
@@ -225,7 +202,7 @@ never executed, only its path geometry is used.
 
 ---
 
-## 11. Stamp library
+## 10. Stamp library
 
 The stamp library lets you save any shape or group as a reusable
 "stamp" that you can stamp back into the scene later.
@@ -237,7 +214,7 @@ The stamp library lets you save any shape or group as a reusable
 
 ---
 
-## 12. Learning mode
+## 11. Learning mode
 
 The right panel's **Learn** tab has three sections:
 
@@ -253,14 +230,14 @@ useful as a warm-up exercise for a class session.
 
 ---
 
-## 13. Saving, loading, and exporting
+## 12. Saving, loading, and exporting
 
 ### Save / Open
 
 - **Save** writes a `.spatio` project file. This is a single JSON
   document containing every object in your scene, its transform, its
-  color and material, the camera position, any stamps you've created,
-  and your animation timeline.
+  color and material, the camera position, and any stamps you've
+  created.
 - **Open** restores a `.spatio` file. Only files saved by version 2 of
   the app are accepted — this is the current format.
 
@@ -287,7 +264,7 @@ down in the slicer.
 
 ---
 
-## 14. Keyboard shortcuts
+## 13. Keyboard shortcuts
 
 | Key | Action |
 |---|---|
@@ -306,7 +283,7 @@ panel in-app.
 
 ---
 
-## 15. Tips for teachers
+## 14. Tips for teachers
 
 - **Plan for short sessions.** A 25-minute activity with a clear goal
   ("build a castle with at least 5 different shapes") works better than
@@ -328,7 +305,7 @@ panel in-app.
 
 ---
 
-## 16. Troubleshooting
+## 15. Troubleshooting
 
 **The app won't open.** Make sure Java 17 or newer is installed. From a
 terminal: `java -version`. If that command isn't found, install a JDK

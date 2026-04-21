@@ -3,7 +3,7 @@
 **Free, offline, no-telemetry 3D modeling for kids ages 6–14.**
 
 Spatio Studio is a desktop application that lets students build, paint,
-animate, and export 3D models. It is designed for classrooms, homes,
+and export 3D models. It is designed for classrooms, homes,
 and computer labs — and is **architecturally incapable of making a
 network connection.** No accounts, no cloud, no analytics, no auto-
 updater, no data collection of any kind.
@@ -24,8 +24,6 @@ Part of the Heronix Education Platform. © Heronix Educational Software.
 - **SVG import** — extrude any `.svg` drawing or logo into a 3D object.
 - **Precision modifiers:** live mirror, array, align / distribute,
   ruler, frame camera, cross-section with live area calc.
-- **Animation timeline** — keyframe positions, rotations, and scales
-  and play back with smooth interpolation.
 - **3D text** — four bundled fonts (Helvetiker, Optimer; regular + bold),
   plus quick A–Z and 0–9 letter generators.
 - **Stamp library** — save and reuse your own shapes.
@@ -68,6 +66,9 @@ On top of that:
 - The JCEF browser is hardened: **DevTools disabled**, popups blocked,
   top-level navigation to non-local URLs blocked, auth credentials
   never supplied.
+- Chromium's **OS-level process sandbox is on**. A renderer RCE (e.g.,
+  from a malicious SVG or font parse bug) stays contained in a
+  restricted child process instead of getting JVM-host-level access.
 
 **Verify it yourself:** install the app, cut the machine off the
 network, delete `%USERPROFILE%\.spatio-studio\`, launch. The app extracts
@@ -109,6 +110,8 @@ For other platforms and thin dev builds, see [docs/INSTALLATION.md](docs/INSTALL
 
 - **[ABOUT.md](ABOUT.md)** — project mission, philosophy, credits,
   license.
+- **[SECURITY.md](SECURITY.md)** — security posture, Chromium pinning,
+  quarterly update policy, vulnerability reporting.
 - **[docs/INSTALLATION.md](docs/INSTALLATION.md)** — install, build,
   and deploy. Has sections for end users, developers, and district IT.
 - **[docs/USER-MANUAL.md](docs/USER-MANUAL.md)** — every feature
