@@ -20,6 +20,10 @@ function deleteSelected() {
   // Stop animation if playing to prevent accessing deleted objects
   if (typeof animPlaying !== 'undefined' && animPlaying) {
     animPlaying = false;
+    if (typeof animFrameId !== 'undefined' && animFrameId) {
+      cancelAnimationFrame(animFrameId);
+      animFrameId = null;
+    }
     var playBtn = document.getElementById('btn-anim-play');
     if (playBtn) playBtn.textContent = '▶ Play';
   }
@@ -41,6 +45,18 @@ function duplicateSelected() {
   var src = objects.find(function(o){ return o.root===selectedRoot; });
   if (!src) return;
   var clone = selectedRoot.clone(true);
+  // Object3D.clone(true) leaves geometry/material references shared with the
+  // original. Deep-clone them so disposing this duplicate later (on undo-stack
+  // eviction) never frees buffers still used by the original.
+  clone.traverse(function(c) {
+    if (!c.isMesh) return;
+    if (c.geometry) c.geometry = c.geometry.clone();
+    if (c.material) {
+      c.material = Array.isArray(c.material)
+        ? c.material.map(function(m) { return m.clone(); })
+        : c.material.clone();
+    }
+  });
   clone.position.x += 1.5;
   clone.position.z += 1.5;
   scene.add(clone);
@@ -138,7 +154,13 @@ function clearScene() {
     if (typeof removeAllMirrorClones === 'function') removeAllMirrorClones();
     if (typeof clearRulerLines === 'function') clearRulerLines();
     if (typeof crossSectionEnabled !== 'undefined' && crossSectionEnabled) toggleCrossSection();
-    if (typeof animPlaying !== 'undefined' && animPlaying) { animPlaying = false; }
+    if (typeof animPlaying !== 'undefined' && animPlaying) {
+      animPlaying = false;
+      if (typeof animFrameId !== 'undefined' && animFrameId) {
+        cancelAnimationFrame(animFrameId);
+        animFrameId = null;
+      }
+    }
     document.getElementById('no-sel').style.display='block';
     document.getElementById('has-sel').style.display='none';
     updateObjCount();

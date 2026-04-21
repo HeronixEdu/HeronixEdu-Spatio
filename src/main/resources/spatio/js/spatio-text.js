@@ -111,19 +111,7 @@ function addText(text) {
   var color = nextColor();
 
   loadFont(currentFontName, function(font) {
-    if (!font) {
-      // Retry once after a short delay
-      setTimeout(function() {
-        loadFont(currentFontName, function(font2) {
-          if (font2) {
-            createTextMesh(text, font2, color);
-          } else {
-            showFontError();
-          }
-        });
-      }, 500);
-      return;
-    }
+    if (!font) { showFontError(); return; }
     createTextMesh(text, font, color);
   });
 }

@@ -70,6 +70,9 @@ function toggleAnimPlay() {
   if (animPlaying) {
     animLastTimestamp = performance.now();
     animLoop();
+  } else if (animFrameId) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
   }
 }
 
@@ -204,6 +207,10 @@ function clearAnimation() {
   animTimeline = [];
   animTime = 0;
   animPlaying = false;
+  if (animFrameId) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
   var btn = document.getElementById('btn-anim-play');
   if (btn) btn.textContent = '▶ Play';
   updateAnimUI();

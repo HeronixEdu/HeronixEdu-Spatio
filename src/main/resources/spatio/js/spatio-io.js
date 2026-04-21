@@ -61,17 +61,28 @@ function loadProject() {
       if (!file) return;
       var reader = new FileReader();
       reader.onload = function(ev) { doLoadProject(ev.target.result); };
+      reader.onerror = function() { showToast('Could not read file', 'warning'); };
       reader.readAsText(file);
     };
     input.click();
   }
 }
 
+function validTriplet(arr) {
+  return Array.isArray(arr) && arr.length >= 3 &&
+    typeof arr[0] === 'number' && typeof arr[1] === 'number' && typeof arr[2] === 'number' &&
+    isFinite(arr[0]) && isFinite(arr[1]) && isFinite(arr[2]);
+}
+
 function doLoadProject(jsonStr) {
   try {
     var project = JSON.parse(jsonStr);
-    if (!project.version || !project.objects) {
-      showProjectLoadError('Invalid project file format.');
+    if (project.version !== 2 || !Array.isArray(project.objects)) {
+      showProjectLoadError(
+        (typeof project.version === 'number' && project.version > 2)
+          ? 'This file was saved by a newer Spatio Studio. Update the app to open it.'
+          : 'Invalid project file format.'
+      );
       return;
     }
     // SECURITY: Limit number of objects to prevent DoS
@@ -94,62 +105,78 @@ function doLoadProject(jsonStr) {
       cam.r = project.camera.r || 22;
       cam.theta = project.camera.theta || -0.55;
       cam.phi = project.camera.phi || 1.05;
-      if (project.camera.target) {
+      if (validTriplet(project.camera.target)) {
         camTarget.set(project.camera.target[0], project.camera.target[1], project.camera.target[2]);
       }
       updateCamera();
     }
 
-    // Recreate objects
+    // Recreate objects — per-entry guarded so one bad object doesn't abort the whole load
+    var skipped = 0;
     project.objects.forEach(function(data) {
-      var prevLen = objects.length;
-
-      if (data.type === 'letter') {
-        var ch = data.name.replace('Letter ', '');
-        addLetter(ch);
-      } else if (data.type === 'group') {
-        // Groups can't be recreated from type alone — skip or add a box placeholder
-        addShape('box');
-        if (objects.length > prevLen) {
-          objects[objects.length - 1].name = data.name;
-          objects[objects.length - 1].type = 'group';
-        }
-      } else {
-        addShape(data.type);
+      if (!data || typeof data.type !== 'string' ||
+          !validTriplet(data.position) || !validTriplet(data.rotation) || !validTriplet(data.scale)) {
+        skipped++;
+        return;
       }
-
-      if (objects.length > prevLen) {
-        var obj = objects[objects.length - 1];
-        obj.name = data.name;
-        obj.root.position.set(data.position[0], data.position[1], data.position[2]);
-        obj.root.rotation.set(data.rotation[0], data.rotation[1], data.rotation[2]);
-        obj.root.scale.set(data.scale[0], data.scale[1], data.scale[2]);
-        if (data.visible === false) obj.root.visible = false;
-
-        // Apply color and material
-        if (data.color) {
-          var col = new THREE.Color(data.color);
-          obj.root.traverse(function(c) {
-            if (c.isMesh && !c.userData.helper) {
-              c.material.color.set(col);
-              if (data.material) {
-                c.material.roughness = data.material.roughness || 0.45;
-                c.material.metalness = data.material.metalness || 0.08;
-                c.material.transparent = data.material.transparent || false;
-                c.material.opacity = data.material.opacity || 1;
-                if (data.material.transparent) c.material.side = THREE.DoubleSide;
-                c.material.needsUpdate = true;
-              }
-            }
-          });
+      var prevLen = objects.length;
+      try {
+        if (data.type === 'letter') {
+          var ch = (data.name || 'Letter A').replace('Letter ', '');
+          addLetter(ch);
+        } else if (data.type === 'group') {
+          // Groups can't be recreated from type alone — add a box placeholder
+          addShape('box');
+          if (objects.length > prevLen) {
+            objects[objects.length - 1].name = data.name;
+            objects[objects.length - 1].type = 'group';
+          }
+        } else {
+          addShape(data.type);
         }
 
-        // Apply params
-        if (data.params) obj.params = data.params;
+        if (objects.length > prevLen) {
+          var obj = objects[objects.length - 1];
+          obj.name = data.name;
+          obj.root.position.set(data.position[0], data.position[1], data.position[2]);
+          obj.root.rotation.set(data.rotation[0], data.rotation[1], data.rotation[2]);
+          obj.root.scale.set(data.scale[0], data.scale[1], data.scale[2]);
+          if (data.visible === false) obj.root.visible = false;
 
-        // Apply hole state
-        obj.isHole = data.isHole || false;
-        if (obj.isHole) applyHoleAppearance(obj);
+          // Apply color and material
+          if (data.color) {
+            var col = new THREE.Color(data.color);
+            obj.root.traverse(function(c) {
+              if (c.isMesh && !c.userData.helper) {
+                c.material.color.set(col);
+                if (data.material) {
+                  c.material.roughness = data.material.roughness || 0.45;
+                  c.material.metalness = data.material.metalness || 0.08;
+                  c.material.transparent = data.material.transparent || false;
+                  c.material.opacity = data.material.opacity || 1;
+                  if (data.material.transparent) c.material.side = THREE.DoubleSide;
+                  c.material.needsUpdate = true;
+                }
+              }
+            });
+          }
+
+          // Apply params
+          if (data.params) obj.params = data.params;
+
+          // Apply hole state
+          obj.isHole = data.isHole || false;
+          if (obj.isHole) applyHoleAppearance(obj);
+        }
+      } catch(objErr) {
+        // Roll back any partial add from this entry so the scene stays consistent
+        console.error('[Spatio] Skipping malformed object:', objErr);
+        if (objects.length > prevLen) {
+          var bad = objects[objects.length - 1];
+          scene.remove(bad.root);
+          objects.length = prevLen;
+        }
+        skipped++;
       }
     });
 
@@ -169,7 +196,11 @@ function doLoadProject(jsonStr) {
     updateObjCount();
     document.getElementById('no-sel').style.display = 'block';
     document.getElementById('has-sel').style.display = 'none';
-    showToast('Project loaded! Keep creating!', 'success');
+    if (skipped > 0) {
+      showToast('Project loaded — ' + objects.length + ' objects (' + skipped + ' skipped as malformed)', 'warning');
+    } else {
+      showToast('Project loaded! Keep creating!', 'success');
+    }
 
   } catch(e) {
     showProjectLoadError(e.message);

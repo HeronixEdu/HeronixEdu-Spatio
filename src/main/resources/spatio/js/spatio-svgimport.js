@@ -24,6 +24,7 @@ function importSVG() {
       if (!file) return;
       var reader = new FileReader();
       reader.onload = function(ev) { parseSVGContent(ev.target.result); };
+      reader.onerror = function() { showToast('Could not read SVG file', 'warning'); };
       reader.readAsText(file);
     };
     input.click();
@@ -41,6 +42,9 @@ function parseSVGContent(svgText) {
     svgText = svgText.replace(/<script[\s\S]*?<\/script>/gi, '');
     svgText = svgText.replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '');
     svgText = svgText.replace(/on\w+\s*=/gi, 'data-blocked=');
+    // Defense in depth: neutralize javascript: / data: URIs in href / xlink:href
+    svgText = svgText.replace(/(href|xlink:href)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
+    svgText = svgText.replace(/(href|xlink:href)\s*=\s*(["'])\s*data:[^"']*\2/gi, '$1="#"');
 
     var loader = new THREE.SVGLoader();
     var data = loader.parse(svgText);
