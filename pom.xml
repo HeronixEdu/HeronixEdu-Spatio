@@ -17,6 +17,8 @@
         <java.version>17</java.version>
         <javafx.version>21</javafx.version>
         <jcef.version>135.0.20</jcef.version>
+        <!-- Full jcefmaven native-bundle version string — tied to the upstream CEF/Chromium build. -->
+        <jcef.natives.version>jcef-ca49ada+cef-135.0.20+ge7de5c3+chromium-135.0.7049.85</jcef.natives.version>
         <gson.version>2.11.0</gson.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -36,6 +38,54 @@
             <version>${gson.version}</version>
         </dependency>
     </dependencies>
+
+    <!--
+      Offline native bundles.
+      When the matching jcef-natives-<platform> artifact is on the classpath,
+      jcefmaven's PackageClasspathStreamer extracts the Chromium binaries from
+      the bundle instead of downloading them on first launch. That keeps Spatio
+      100% offline — no network call is ever made during install, first run, or
+      normal use.
+
+      The Windows x64 bundle ships by default because Windows is the primary
+      K-12 deployment target. For a slim dev build, deactivate the profile:
+          mvn -P-offline-bundle-win package
+    -->
+    <profiles>
+        <profile>
+            <id>offline-bundle-win</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <dependencies>
+                <dependency>
+                    <groupId>me.friwi</groupId>
+                    <artifactId>jcef-natives-windows-amd64</artifactId>
+                    <version>${jcef.natives.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>offline-bundle-mac-amd64</id>
+            <dependencies>
+                <dependency>
+                    <groupId>me.friwi</groupId>
+                    <artifactId>jcef-natives-macosx-amd64</artifactId>
+                    <version>${jcef.natives.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+        <profile>
+            <id>offline-bundle-mac-arm64</id>
+            <dependencies>
+                <dependency>
+                    <groupId>me.friwi</groupId>
+                    <artifactId>jcef-natives-macosx-arm64</artifactId>
+                    <version>${jcef.natives.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

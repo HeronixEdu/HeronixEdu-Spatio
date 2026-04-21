@@ -22,6 +22,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Collections;
 
 /**
  * Spatio Studio — pure Swing/AWT application with embedded Chromium (JCEF).
@@ -45,16 +46,42 @@ public class SpatioApplication {
             Path webRoot = extractWebResources();
             System.out.println("[Spatio] Web resources at: " + webRoot);
 
+            // OFFLINE GUARANTEE: the Chromium native bundle ships as a classpath
+            // resource via the jcef-natives-<platform> Maven dependency. When it's
+            // present, jcefmaven extracts from the classpath; when it's not, the
+            // library would try to download ~120 MB from the internet. Detect the
+            // bundle marker class up front and refuse to run otherwise — never
+            // silently fall back to the network.
+            boolean nativeBundleOnClasspath;
+            try {
+                Class.forName("me.friwi.jcefmaven.CefNativeBundle");
+                nativeBundleOnClasspath = true;
+            } catch (ClassNotFoundException ignored) {
+                nativeBundleOnClasspath = false;
+            }
+            if (!nativeBundleOnClasspath) {
+                System.err.println(
+                    "[Spatio] FATAL: No Chromium native bundle on classpath.\n" +
+                    "This build was produced without the offline native bundle profile.\n" +
+                    "Rebuild with: mvn package (the default profile includes jcef-natives-windows-amd64)."
+                );
+                System.exit(2);
+            }
+
             // Build JCEF
             CefAppBuilder builder = new CefAppBuilder();
             Path installDir = Path.of(System.getProperty("user.home"), ".spatio-studio", "jcef");
             builder.setInstallDir(installDir.toFile());
+            // SECURITY: empty mirror list disables the network fallback entirely.
+            // If extraction from the classpath bundle ever fails, the build
+            // fails fast instead of quietly fetching ~120 MB over the network.
+            builder.setMirrors(Collections.emptyList());
 
             CefSettings settings = builder.getCefSettings();
             settings.windowless_rendering_enabled = false;
             settings.log_severity = CefSettings.LogSeverity.LOGSEVERITY_WARNING;
             settings.remote_debugging_port = 0; // SECURITY: Disable DevTools
-            // Suppress Google API keys warning and disable features that need internet
+            // Disable every Chromium feature that reaches the network or phones home.
             builder.addJcefArgs("--no-sandbox");
             builder.addJcefArgs("--disable-extensions");
             builder.addJcefArgs("--disable-component-update");
@@ -63,11 +90,30 @@ public class SpatioApplication {
             builder.addJcefArgs("--disable-default-apps");
             builder.addJcefArgs("--disable-sync");
             builder.addJcefArgs("--no-first-run");
+            builder.addJcefArgs("--no-default-browser-check");
             builder.addJcefArgs("--disable-translate");
-            builder.addJcefArgs("--disable-features=MediaRouter");
+            builder.addJcefArgs("--disable-domain-reliability");
+            builder.addJcefArgs("--disable-breakpad");
+            builder.addJcefArgs("--disable-crash-reporter");
+            builder.addJcefArgs("--no-pings");
+            builder.addJcefArgs("--disable-speech-api");
+            builder.addJcefArgs("--disable-features=MediaRouter,OptimizationHints,NetworkTimeServiceQuerying,InterestFeedContentSuggestions,Translate,AutofillServerCommunication");
+            builder.addJcefArgs("--metrics-recording-only");
+            builder.addJcefArgs("--disable-logging");
             builder.addJcefArgs("--disable-gpu-shader-disk-cache");
             builder.addJcefArgs("--disable-application-cache");
             builder.addJcefArgs("--aggressive-cache-discard");
+            // HARD NETWORK BLACKHOLE — these two flags make it architecturally
+            // impossible for the renderer to reach any host:
+            //   1. Every DNS lookup returns NOTFOUND (no name can resolve).
+            //   2. All proxy-routable traffic is pointed at a closed loopback
+            //      port that refuses connections instantly.
+            // file:// URLs bypass DNS and proxy, so local resource loads still
+            // work. Anything that tries to reach the internet fails at layer 4.
+            builder.addJcefArgs("--host-resolver-rules=MAP * ~NOTFOUND");
+            builder.addJcefArgs("--proxy-server=127.0.0.1:1");
+            builder.addJcefArgs("--disable-quic");
+            builder.addJcefArgs("--disable-http2");
 
             builder.setAppHandler(new MavenCefAppHandlerAdapter() {
                 @Override
@@ -108,18 +154,49 @@ public class SpatioApplication {
                 }
             });
 
-            // SECURITY: Block navigation to external URLs — only allow file:// from temp dir
+            // SECURITY: Block external navigation AND subresource requests.
+            // - onBeforeBrowse catches top-level navigations.
+            // - getResourceRequestHandler returns a handler whose
+            //   onBeforeResourceLoad catches every subresource (XHR, fetch,
+            //   img src, stylesheet, script src, ...). Anything not served
+            //   from a local scheme is cancelled.
+            final org.cef.handler.CefResourceRequestHandler resourceBlock =
+                new org.cef.handler.CefResourceRequestHandlerAdapter() {
+                    @Override
+                    public boolean onBeforeResourceLoad(CefBrowser browser, CefFrame frame,
+                                                        org.cef.network.CefRequest request) {
+                        String url = request.getURL();
+                        if (isLocalUrl(url)) return false;
+                        System.err.println("[Spatio] BLOCKED resource load: " + url);
+                        return true; // true = cancel request
+                    }
+                };
             cefClient.addRequestHandler(new org.cef.handler.CefRequestHandlerAdapter() {
                 @Override
                 public boolean onBeforeBrowse(CefBrowser browser, CefFrame frame,
                                               org.cef.network.CefRequest request, boolean user_gesture,
                                               boolean is_redirect) {
                     String url = request.getURL();
-                    if (url != null && url.startsWith("file:///")) {
-                        return false; // Allow local file URLs
-                    }
+                    if (isLocalUrl(url)) return false;
                     System.err.println("[Spatio] BLOCKED navigation to: " + url);
-                    return true; // Block everything else
+                    return true;
+                }
+
+                @Override
+                public org.cef.handler.CefResourceRequestHandler getResourceRequestHandler(
+                        CefBrowser browser, CefFrame frame, org.cef.network.CefRequest request,
+                        boolean isNavigation, boolean isDownload, String requestInitiator,
+                        org.cef.misc.BoolRef disableDefaultHandling) {
+                    return resourceBlock;
+                }
+
+                @Override
+                public boolean getAuthCredentials(CefBrowser browser, String origin_url,
+                                                  boolean isProxy, String host, int port,
+                                                  String realm, String scheme,
+                                                  org.cef.callback.CefAuthCallback callback) {
+                    // Never supply credentials for any network auth prompt.
+                    return false;
                 }
             });
 
@@ -202,6 +279,21 @@ public class SpatioApplication {
             e.printStackTrace();
             System.exit(1);
         }
+    }
+
+    /**
+     * Local-only schemes. file:// is our runtime resource dir; data: and blob:
+     * are in-memory (no network); about: and chrome-devtools: are Chromium
+     * internal (DevTools are disabled anyway, but allow the scheme so it can
+     * 404 cleanly rather than triggering a red "blocked" log line).
+     */
+    private static boolean isLocalUrl(String url) {
+        if (url == null) return false;
+        return url.startsWith("file://")
+            || url.startsWith("data:")
+            || url.startsWith("blob:")
+            || url.startsWith("about:")
+            || url.startsWith("chrome-devtools:");
     }
 
     private void shutdown() {
