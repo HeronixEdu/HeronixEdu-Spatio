@@ -103,7 +103,16 @@ public class SpatioApplication {
             builder.addJcefArgs("--disable-crash-reporter");
             builder.addJcefArgs("--no-pings");
             builder.addJcefArgs("--disable-speech-api");
-            builder.addJcefArgs("--disable-features=MediaRouter,OptimizationHints,NetworkTimeServiceQuerying,InterestFeedContentSuggestions,Translate,AutofillServerCommunication");
+            // The feature list is long intentionally — every entry here
+            // either opens a network path (WebRtc, NetworkTimeServiceQuerying,
+            // AutofillServerCommunication) or enables a sensor/stream API
+            // (MediaStream, AudioServiceOutOfProcess) we have no use for in
+            // a 3D modeling tool. Removing them at the Chromium feature layer
+            // kills the whole subsystem instead of relying on the URL handler
+            // or DNS blackhole to catch every egress path individually.
+            builder.addJcefArgs("--disable-features=MediaRouter,OptimizationHints,NetworkTimeServiceQuerying,InterestFeedContentSuggestions,Translate,AutofillServerCommunication,WebRtc,WebRtcHideLocalIpsWithMdns,MediaStreamTrackTransferable,BackgroundFetch,BackgroundSync,PushMessaging,Notifications,GenericSensorExtraClasses,Geolocation,IdleDetection");
+            builder.addJcefArgs("--disable-speech-synthesis-api");
+            builder.addJcefArgs("--disable-webgl-image-chromium");
             builder.addJcefArgs("--metrics-recording-only");
             builder.addJcefArgs("--disable-logging");
             builder.addJcefArgs("--disable-gpu-shader-disk-cache");

@@ -48,8 +48,10 @@ layers enforce this at runtime:
    refuses connections.
 3. **Every non-local resource load** (XHR, fetch, img, script,
    stylesheet, etc.) is cancelled at the JCEF request-handler level
-   unless the URL scheme is `file:`, `data:`, `blob:`, `about:`, or
-   `chrome-devtools:`.
+   unless the URL scheme is `file:`, `about:`, or `chrome-devtools:`.
+   `data:` and `blob:` are intentionally excluded — the app's only
+   uses of them pass content over the Java bridge as strings, not as
+   URL loads. See `SECURITY.md` for the full rationale.
 
 On top of that:
 

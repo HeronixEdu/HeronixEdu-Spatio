@@ -38,11 +38,22 @@ function parseSVGContent(svgText) {
       showToast('SVG file too large (max 5MB)', 'warning');
       return;
     }
-    // SECURITY: Strip dangerous elements from SVG
+    // SECURITY: Strip dangerous elements from SVG.
+    // Three.js SVGLoader only extracts <path> geometry and color metadata;
+    // everything below is belt-and-suspenders in case a future loader
+    // change (or a different renderer in a derived app) interprets them.
     svgText = svgText.replace(/<script[\s\S]*?<\/script>/gi, '');
     svgText = svgText.replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, '');
+    // <filter>/<feImage>, <image>, <use> can carry external references in
+    // a full SVG renderer; strip them pre-parse so no loader can act on
+    // them even if Three.js is swapped later.
+    svgText = svgText.replace(/<filter[\s\S]*?<\/filter>/gi, '');
+    svgText = svgText.replace(/<image\b[^>]*\/?>/gi, '');
+    svgText = svgText.replace(/<image\b[\s\S]*?<\/image>/gi, '');
+    svgText = svgText.replace(/<use\b[^>]*\/?>/gi, '');
+    svgText = svgText.replace(/<use\b[\s\S]*?<\/use>/gi, '');
     svgText = svgText.replace(/on\w+\s*=/gi, 'data-blocked=');
-    // Defense in depth: neutralize javascript: / data: URIs in href / xlink:href
+    // Neutralize javascript: / data: URIs inside href / xlink:href.
     svgText = svgText.replace(/(href|xlink:href)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '$1="#"');
     svgText = svgText.replace(/(href|xlink:href)\s*=\s*(["'])\s*data:[^"']*\2/gi, '$1="#"');
 

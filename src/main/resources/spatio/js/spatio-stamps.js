@@ -130,35 +130,3 @@ function updateStampUI() {
   });
 }
 
-/**
- * Export stamps to JSON (for sharing between students)
- */
-function exportStamps() {
-  if (stampLibrary.length === 0) { showToast('No stamps to export!', 'warning'); return; }
-  var json = JSON.stringify({ stamps: stampLibrary }, null, 2);
-  dl('my_stamps.json', json, 'Stamps exported!');
-}
-
-/**
- * Import stamps from JSON
- */
-function importStamps() {
-  if (window.javaApp && window.javaApp.showOpenDialog) {
-    window.javaApp.showOpenDialog().then(function(path) {
-      if (!path) return;
-      window.javaApp.readFile(path).then(function(content) {
-        if (!content) return;
-        try {
-          var data = JSON.parse(content);
-          if (data.stamps) {
-            stampLibrary = stampLibrary.concat(data.stamps);
-            updateStampUI();
-            showToast('Imported ' + data.stamps.length + ' stamps!', 'success');
-          }
-        } catch(e) {
-          showToast('Invalid stamp file', 'error');
-        }
-      });
-    });
-  }
-}

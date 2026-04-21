@@ -73,9 +73,11 @@ patch Chromium directly without a jcefmaven release.**
 For a machine that is fully offline and running Spatio, the realistic
 attack vector is a **malicious file opened by a user**:
 
-- `.spatio` project files — parsed as JSON by `Gson` (not Chromium);
-  object limits and triplet validation in `spatio-io.js` defang
-  malformed input. Low renderer attack surface.
+- `.spatio` project files — parsed as JSON by `Gson` (not Chromium).
+  Hard-capped at **500 objects per project** (rejected with a clear
+  error above the cap), and each object's `position`/`rotation`/`scale`
+  triplet is validated as finite numeric before use. Malformed entries
+  are skipped with a user-visible count. Low renderer attack surface.
 - `.svg` files — parsed by Three.js's `SVGLoader`. The SVG content is
   first run through a set of sanitization regexes in
   `spatio-svgimport.js` (strips `<script>`, `<foreignObject>`, `on*`

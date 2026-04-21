@@ -37,11 +37,13 @@ public class JavaBridge {
     );
 
     // Security: allowed file extensions for read/import operations.
-    // Only three callers use readFile (JS grep): loadProject (.spatio),
-    // importSVG (.svg), importStamps (.json). .stl and .obj are
-    // export-only and never read by the app.
+    // Only two callers use readFile (JS grep): loadProject (.spatio) and
+    // importSVG (.svg). .stl and .obj are export-only and never read.
+    // .json is no longer permitted — the dead stamps import/export was
+    // removed. Adding a new read-capable format requires deliberately
+    // unlocking it here and thinking through the parser's attack surface.
     private static final Set<String> ALLOWED_READ_EXTENSIONS = new HashSet<>(
-            Arrays.asList(".spatio", ".svg", ".json")
+            Arrays.asList(".spatio", ".svg")
     );
 
     public JavaBridge(Component parentFrame) {
@@ -101,12 +103,6 @@ public class JavaBridge {
                             callback.failure(-1, "File access denied");
                             return true;
                         }
-                        // SECURITY: single-use token — remove as soon as we've
-                        // matched it. The JS flow is always dialog → one
-                        // readFile, so we don't need to keep the entry around;
-                        // removing it prevents the allowlist from growing for
-                        // the life of the process and also prevents replay.
-                        allowedReadPaths.remove(canonical);
                         // SECURITY: Check file extension
                         String ext = getExtension(canonical);
                         if (!ALLOWED_READ_EXTENSIONS.contains(ext)) {
@@ -120,7 +116,16 @@ public class JavaBridge {
                             callback.failure(-1, "File too large");
                             return true;
                         }
-                        callback.success(Files.readString(Path.of(canonical)));
+                        String content = Files.readString(Path.of(canonical));
+                        // SECURITY: single-use token — consume only on a
+                        // successful read. If the read fails (file deleted
+                        // between dialog and read, permission error, I/O
+                        // glitch), the token stays and the user can retry
+                        // without opening the dialog again. The set still
+                        // stays bounded because successful reads pop the
+                        // token and the dialogs are the only way to add one.
+                        allowedReadPaths.remove(canonical);
+                        callback.success(content);
                     } catch (Exception e) {
                         callback.failure(-1, "Read failed");
                     }
