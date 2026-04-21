@@ -184,8 +184,6 @@ function doLoadProject(jsonStr) {
       stampLibrary = project.stamps;
       if (typeof updateStampUI === 'function') updateStampUI();
     }
-    // project.animation from older files is silently ignored — animation
-    // support was removed.
 
     deselect();
     updateObjCount();

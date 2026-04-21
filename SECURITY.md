@@ -16,8 +16,9 @@ at runtime. Details in `README.md`. The short version:
 - Chromium's DNS resolver is set to return `NOTFOUND` for every host.
 - Chromium's proxy is pointed at a closed loopback port.
 - Every non-local subresource load is cancelled at the JCEF handler
-  level (only `file:`, `data:`, `blob:`, `about:`, and
-  `chrome-devtools:` URLs pass).
+  level — only `file:`, `about:`, and `chrome-devtools:` URLs pass.
+  `data:` and `blob:` are intentionally excluded (see the `isLocalUrl`
+  comment in `SpatioApplication.java` for the reasoning).
 
 No telemetry. No crash reports. No auto-updater. No "anonymous"
 anything.

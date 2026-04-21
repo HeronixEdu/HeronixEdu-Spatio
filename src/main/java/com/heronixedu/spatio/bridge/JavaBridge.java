@@ -36,9 +36,12 @@ public class JavaBridge {
             Arrays.asList(".spatio", ".stl", ".obj", ".gltf", ".json", ".png")
     );
 
-    // Security: allowed file extensions for read/import operations
+    // Security: allowed file extensions for read/import operations.
+    // Only three callers use readFile (JS grep): loadProject (.spatio),
+    // importSVG (.svg), importStamps (.json). .stl and .obj are
+    // export-only and never read by the app.
     private static final Set<String> ALLOWED_READ_EXTENSIONS = new HashSet<>(
-            Arrays.asList(".spatio", ".stl", ".obj", ".svg", ".json")
+            Arrays.asList(".spatio", ".svg", ".json")
     );
 
     public JavaBridge(Component parentFrame) {
@@ -204,7 +207,7 @@ public class JavaBridge {
             JFileChooser chooser = new JFileChooser();
             chooser.setDialogTitle("Import 3D Model");
             if (lastDirectory != null) chooser.setCurrentDirectory(lastDirectory);
-            chooser.setFileFilter(new FileNameExtensionFilter("3D Models & SVG", "stl", "obj", "svg", "json"));
+            chooser.setFileFilter(new FileNameExtensionFilter("SVG Files", "svg"));
 
             if (chooser.showOpenDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
                 File file = chooser.getSelectedFile();
