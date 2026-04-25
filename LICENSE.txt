@@ -1,0 +1,59 @@
+Spatio Studio
+Copyright (c) Heronix Educational Software. All rights reserved.
+
+This program is part of the Heronix Education Platform.
+
+PERMITTED USE
+-------------
+Spatio Studio is provided free of charge for educational use in K-12
+classrooms, after-school programs, libraries, and at home by students
+and their families. You may install and use it on any number of
+machines for these purposes without further permission.
+
+You may redistribute the original, unmodified installer or zip bundle
+to schools, parents, and students.
+
+RESTRICTIONS
+------------
+You may not:
+  - Modify, decompile, reverse engineer, or create derivative works
+    based on the application or its bundled assets.
+  - Remove or alter the Heronix Educational Software branding,
+    copyright notices, or about-screen content.
+  - Sublicense, rent, lease, or sell the application or any part of it.
+  - Use the application as a component of a paid commercial product.
+
+THIRD-PARTY COMPONENTS
+----------------------
+Spatio Studio bundles unmodified copies of the following third-party
+components, each licensed under its own terms:
+
+  - jcefmaven (https://github.com/jcefmaven/jcefmaven)
+    Apache License 2.0
+  - JCEF / Chromium Embedded Framework
+    BSD 3-Clause License
+  - Three.js (https://threejs.org)
+    MIT License
+  - Helvetiker and Optimer typeface JSONs (Three.js distribution)
+    See typefaces.js project license terms
+  - Google Gson
+    Apache License 2.0
+
+The full text of these licenses is included with the corresponding
+runtime files inside the bundle.
+
+NO WARRANTY
+-----------
+This software is provided "as is", without warranty of any kind,
+express or implied, including but not limited to the warranties of
+merchantability, fitness for a particular purpose, and noninfringement.
+In no event shall the authors or copyright holders be liable for any
+claim, damages, or other liability, whether in an action of contract,
+tort, or otherwise, arising from, out of, or in connection with the
+software or the use or other dealings in the software.
+
+CONTACT
+-------
+For licensing questions, district pilots, or other inquiries, contact
+Heronix Educational Software through your school's existing channel
+or by reaching the project repository maintainer.

@@ -1,11 +1,18 @@
-# build-icon.ps1 — generate a multi-size Windows .ico from the master PNG.
+# build-icon.ps1 — derive Windows logo assets from the master PNG.
 #
-# Run once when the logo changes; output lives at
-#   src/main/resources/spatio/images/Icon.ico
-# and is consumed by the jpackage plugin for the SpatioStudio.exe icon.
+# Outputs:
+#   src/main/resources/spatio/images/Icon.ico    multi-size Windows icon
+#                                                 (16/24/32/48/64/128/256)
+#   src/main/resources/spatio/images/splash.png  400x400 launch splash
+#                                                 used by jpackage --java-options
+#                                                 -splash:$APPDIR/splash.png
 #
-# No external tools required. Uses .NET System.Drawing to resize and packs
-# a modern PNG-embedded ICO (each entry is a PNG blob — Windows Vista+ supports this).
+# Run once when the logo changes; both files are consumed by the jpackage
+# build (mvn -Pdist-windows verify).
+#
+# No external tools required. Uses .NET System.Drawing to resize. The .ico
+# is a modern PNG-embedded ICO (each entry is a PNG blob — Vista+ supports
+# this format).
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
@@ -74,3 +81,21 @@ $bw.Close()
 $fs.Close()
 
 Write-Host "Wrote $dst ($([System.IO.FileInfo]::new($dst).Length) bytes)"
+
+# Splash PNG (400x400) — JVM splash shown by jpackage launcher during JCEF init.
+$splashDst = Join-Path $repoRoot 'src\main\resources\spatio\images\splash.png'
+$splashSize = 400
+
+$source = [System.Drawing.Bitmap]::FromFile($src)
+$splash = New-Object System.Drawing.Bitmap $splashSize, $splashSize
+$g = [System.Drawing.Graphics]::FromImage($splash)
+$g.InterpolationMode  = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+$g.SmoothingMode      = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+$g.PixelOffsetMode    = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+$g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+$g.DrawImage($source, 0, 0, $splashSize, $splashSize)
+$g.Dispose()
+$splash.Save($splashDst, [System.Drawing.Imaging.ImageFormat]::Png)
+$splash.Dispose()
+$source.Dispose()
+Write-Host "Wrote $splashDst ($([System.IO.FileInfo]::new($splashDst).Length) bytes)"
