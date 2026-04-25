@@ -21,6 +21,17 @@
         <jcef.natives.version>jcef-ca49ada+cef-135.0.20+ge7de5c3+chromium-135.0.7049.85</jcef.natives.version>
         <gson.version>2.11.0</gson.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+          jpackage app version. Must match /\d+(\.\d+){0,2}/ — no SNAPSHOT
+          or qualifiers. Bump alongside <version> above when cutting a
+          release build. Kept separate because <version> carries -SNAPSHOT
+          during development.
+        -->
+        <spatio.app.version>1.0.0</spatio.app.version>
+        <!-- Stable UUID for the Windows MSI upgrade code. Generated once
+             and hardcoded so future versions upgrade in place instead of
+             installing side-by-side. Do NOT change this. -->
+        <spatio.win.upgrade.uuid>1CA16FB4-B2A6-42ED-93FC-DA087B1C2CFF</spatio.win.upgrade.uuid>
     </properties>
 
     <dependencies>
@@ -54,8 +65,19 @@
     <profiles>
         <profile>
             <id>offline-bundle-win</id>
+            <!--
+              Property-based activation rather than activeByDefault:
+              activeByDefault profiles are silently deactivated whenever
+              the user names any other profile with -P. That caused the
+              distribution build (-Pdist-windows) to ship a 16 MB thin
+              JAR instead of the 157 MB offline JAR. This activation is
+              immune to that behavior — it stays active unless the user
+              explicitly sets -Dno-offline-bundle or -P-offline-bundle-win.
+            -->
             <activation>
-                <activeByDefault>true</activeByDefault>
+                <property>
+                    <name>!no-offline-bundle</name>
+                </property>
             </activation>
             <dependencies>
                 <dependency>
@@ -84,6 +106,154 @@
                     <version>${jcef.natives.version}</version>
                 </dependency>
             </dependencies>
+        </profile>
+
+        <!--
+          Windows distribution: app-image (folder).
+
+              mvn -Pdist-windows verify
+
+          Produces target/dist/SpatioStudio/ — a self-contained folder
+          holding SpatioStudio.exe (with our logo), a jlink-trimmed JRE,
+          and the fat JAR. No separate Java install needed on the target
+          machine. Zip the folder to ship it as a portable bundle.
+
+          Does NOT require WiX Toolset. For a proper .msi installer, use
+          the dist-windows-msi profile below.
+
+          Internals: an antrun step stages only the fat JAR into
+          target/jpackage-input/ so jpackage's input directory is clean
+          (no compile intermediates, no recursion into target/dist/).
+          jpackage binds to 'verify' to guarantee it runs after shade.
+        -->
+        <profile>
+            <id>dist-windows</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>stage-jpackage-input</id>
+                                <phase>package</phase>
+                                <goals><goal>run</goal></goals>
+                                <configuration>
+                                    <target>
+                                        <delete dir="${project.build.directory}/jpackage-input" quiet="true"/>
+                                        <mkdir dir="${project.build.directory}/jpackage-input"/>
+                                        <copy file="${project.build.directory}/${project.artifactId}-${project.version}.jar"
+                                              todir="${project.build.directory}/jpackage-input"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <version>1.6.5</version>
+                        <executions>
+                            <execution>
+                                <id>jpackage-win-app-image</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>APP_IMAGE</type>
+                                    <name>SpatioStudio</name>
+                                    <appVersion>${spatio.app.version}</appVersion>
+                                    <vendor>Heronix Educational Software</vendor>
+                                    <copyright>© Heronix Educational Software</copyright>
+                                    <description>Offline 3D modeling studio for K-12.</description>
+                                    <destination>${project.build.directory}/dist</destination>
+                                    <input>${project.build.directory}/jpackage-input</input>
+                                    <mainJar>${project.artifactId}-${project.version}.jar</mainJar>
+                                    <mainClass>com.heronixedu.spatio.Launcher</mainClass>
+                                    <icon>${project.basedir}/src/main/resources/spatio/images/Icon.ico</icon>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!--
+          Windows distribution: MSI installer.
+
+              mvn -Pdist-windows-msi verify
+
+          Produces target/dist/SpatioStudio-<version>.msi — a proper
+          Windows installer with menu entry, desktop shortcut, and
+          per-user install (no admin rights required). Silent install
+          via: msiexec /i SpatioStudio-1.0.0.msi /qn
+
+          REQUIRES WiX Toolset v3.14 on PATH. Install from:
+          https://github.com/wixtoolset/wix3/releases
+          After install, verify `candle -?` works in a new shell.
+        -->
+        <profile>
+            <id>dist-windows-msi</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>stage-jpackage-input</id>
+                                <phase>package</phase>
+                                <goals><goal>run</goal></goals>
+                                <configuration>
+                                    <target>
+                                        <delete dir="${project.build.directory}/jpackage-input" quiet="true"/>
+                                        <mkdir dir="${project.build.directory}/jpackage-input"/>
+                                        <copy file="${project.build.directory}/${project.artifactId}-${project.version}.jar"
+                                              todir="${project.build.directory}/jpackage-input"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <version>1.6.5</version>
+                        <executions>
+                            <execution>
+                                <id>jpackage-win-msi</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                                <configuration>
+                                    <type>MSI</type>
+                                    <name>SpatioStudio</name>
+                                    <appVersion>${spatio.app.version}</appVersion>
+                                    <vendor>Heronix Educational Software</vendor>
+                                    <copyright>© Heronix Educational Software</copyright>
+                                    <description>Offline 3D modeling studio for K-12.</description>
+                                    <destination>${project.build.directory}/dist</destination>
+                                    <input>${project.build.directory}/jpackage-input</input>
+                                    <mainJar>${project.artifactId}-${project.version}.jar</mainJar>
+                                    <mainClass>com.heronixedu.spatio.Launcher</mainClass>
+                                    <icon>${project.basedir}/src/main/resources/spatio/images/Icon.ico</icon>
+                                    <winMenu>true</winMenu>
+                                    <winMenuGroup>Heronix</winMenuGroup>
+                                    <winShortcut>true</winShortcut>
+                                    <winPerUserInstall>true</winPerUserInstall>
+                                    <winDirChooser>true</winDirChooser>
+                                    <winUpgradeUuid>${spatio.win.upgrade.uuid}</winUpgradeUuid>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 
