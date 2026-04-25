@@ -99,7 +99,7 @@ handlers without mitigation.
 ## Reporting a vulnerability
 
 If you find a security issue in Spatio or in the Heronix Education
-Platform, contact Heronix Educational Software through the channel
+Platform, contact Heronix Education Systems LLC through the channel
 your district uses, or open a private issue / email the repository
 maintainer. Do **not** file publicly before we have had a chance to
 respond. We aim to respond within one business week.

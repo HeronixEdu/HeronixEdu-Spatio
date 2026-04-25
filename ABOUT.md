@@ -37,7 +37,7 @@ minutes of use. Spatio is built to feel generous from the first click.
 
 ## Why it is free
 
-Spatio is the free gift that Heronix Educational Software gives to every
+Spatio is the free gift that Heronix Education Systems LLC gives to every
 district it talks to. We build paid products for administrators — this
 is the one we give to the kids.
 
@@ -58,7 +58,7 @@ packaged by the jcefmaven project).
 
 ## Credits
 
-- Built and maintained by **Heronix Educational Software**.
+- Built and maintained by **Heronix Education Systems LLC**.
 - JCEF native bundles provided by the **jcefmaven** project
   (github.com/jcefmaven/jcefmaven), licensed under Apache 2.0.
 - Three.js by its authors, licensed under MIT.
@@ -66,7 +66,7 @@ packaged by the jcefmaven project).
 
 ## License
 
-Part of the Heronix Education Platform. © Heronix Educational Software.
+Part of the Heronix Education Platform. © Heronix Education Systems LLC.
 See `LICENSE` for full terms.
 
 ## Contact

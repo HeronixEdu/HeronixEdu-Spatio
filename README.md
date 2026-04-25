@@ -8,7 +8,7 @@ and computer labs — and is **architecturally incapable of making a
 network connection.** No accounts, no cloud, no analytics, no auto-
 updater, no data collection of any kind.
 
-Part of the Heronix Education Platform. © Heronix Educational Software.
+Part of the Heronix Education Platform. © Heronix Education Systems LLC.
 
 ---
 
@@ -167,5 +167,5 @@ src/main/resources/spatio/
 
 ## License
 
-Part of the Heronix Education Platform. © Heronix Educational Software.
+Part of the Heronix Education Platform. © Heronix Education Systems LLC.
 See `ABOUT.md` for full credits.

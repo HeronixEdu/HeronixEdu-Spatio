@@ -1,5 +1,5 @@
 Spatio Studio
-Copyright (c) Heronix Educational Software. All rights reserved.
+Copyright (c) Heronix Education Systems LLC. All rights reserved.
 
 This program is part of the Heronix Education Platform.
 
@@ -18,7 +18,7 @@ RESTRICTIONS
 You may not:
   - Modify, decompile, reverse engineer, or create derivative works
     based on the application or its bundled assets.
-  - Remove or alter the Heronix Educational Software branding,
+  - Remove or alter the Heronix Education Systems LLC branding,
     copyright notices, or about-screen content.
   - Sublicense, rent, lease, or sell the application or any part of it.
   - Use the application as a component of a paid commercial product.
@@ -55,5 +55,5 @@ software or the use or other dealings in the software.
 CONTACT
 -------
 For licensing questions, district pilots, or other inquiries, contact
-Heronix Educational Software through your school's existing channel
+Heronix Education Systems LLC through your school's existing channel
 or by reaching the project repository maintainer.

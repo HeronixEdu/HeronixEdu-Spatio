@@ -151,8 +151,8 @@
                                     <type>APP_IMAGE</type>
                                     <name>SpatioStudio</name>
                                     <appVersion>${spatio.app.version}</appVersion>
-                                    <vendor>Heronix Educational Software</vendor>
-                                    <copyright>© Heronix Educational Software</copyright>
+                                    <vendor>Heronix Education Systems LLC</vendor>
+                                    <copyright>© Heronix Education Systems LLC</copyright>
                                     <description>Offline 3D modeling studio for K-12.</description>
                                     <destination>${project.build.directory}/dist</destination>
                                     <input>${project.build.directory}/jpackage-input</input>
@@ -279,8 +279,8 @@
                                     <type>MSI</type>
                                     <name>SpatioStudio</name>
                                     <appVersion>${spatio.app.version}</appVersion>
-                                    <vendor>Heronix Educational Software</vendor>
-                                    <copyright>© Heronix Educational Software</copyright>
+                                    <vendor>Heronix Education Systems LLC</vendor>
+                                    <copyright>© Heronix Education Systems LLC</copyright>
                                     <description>Offline 3D modeling studio for K-12.</description>
                                     <destination>${project.build.directory}/dist</destination>
                                     <input>${project.build.directory}/jpackage-input</input>
