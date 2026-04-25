@@ -40,8 +40,18 @@ to many machines at once. Skip to the section that applies to you.
 
 ### Where your files live
 
-- **Projects:** wherever you save them. Use `File → Save` to choose a
-  location. Projects are plain `.spatio` JSON files.
+- **Projects:** default to `%USERPROFILE%\Documents\Spatio Projects\` on
+  Windows. The app creates this folder on first launch. Every
+  Save / Open / Import dialog defaults to it, so students can just click
+  Save without fighting with file paths. You can still navigate
+  elsewhere from the dialog (for example, to save to a USB stick); the
+  app remembers the last folder you picked within a session.
+
+  On a school machine with Windows Folder Redirection set up via Group
+  Policy, the student's Documents folder is usually routed to their
+  personal network home drive — which means `Spatio Projects` also lives
+  there, and projects follow the student between lab machines.
+
 - **App data:** `%USERPROFILE%\.spatio-studio\` (Windows) — this holds
   the Chromium runtime and nothing else. Safe to delete; the app will
   re-extract it on next launch.
@@ -52,8 +62,9 @@ to many machines at once. Skip to the section that applies to you.
 
 - Delete the `.jar` file.
 - Delete `%USERPROFILE%\.spatio-studio\` to remove the bundled Chromium.
-- Your saved `.spatio` projects are not touched — they stay wherever
-  you saved them.
+- Your saved `.spatio` projects are not touched. By default they live in
+  `%USERPROFILE%\Documents\Spatio Projects\`; delete that folder too if
+  you want to wipe student work.
 
 ---
 
@@ -186,6 +197,15 @@ normal operation.
 
 There is no student data to consider. The app has no account system,
 no cloud sync, no collaboration features, and no network activity.
-Student projects live as `.spatio` files on local disk in whatever
-folder the student or teacher saves them to. Back them up the same way
-you back up any other student work.
+Student projects live as `.spatio` files on local disk. By default they
+go in `%USERPROFILE%\Documents\Spatio Projects\` — every Save dialog
+starts there, so students don't have to know or care about file paths.
+
+If you use Windows Folder Redirection to redirect `Documents` to a
+network home drive (a common K-12 pattern for "students can't save
+locally"), `Spatio Projects` rides along — work is persisted on the
+network share and follows the student to any lab machine without any
+configuration on Spatio's part. No special setup needed.
+
+Back projects up the same way you back up any other student work in
+Documents.

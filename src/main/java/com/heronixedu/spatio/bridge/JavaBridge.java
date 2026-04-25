@@ -8,11 +8,14 @@ import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Bridge between JCEF JavaScript and native Java file system operations.
@@ -28,8 +31,10 @@ public class JavaBridge {
     private Component parentFrame;
     private File lastDirectory;
 
-    // Security: track paths returned by file dialogs — only these can be read
-    private final Set<String> allowedReadPaths = new HashSet<>();
+    // Security: track paths returned by file dialogs — only these can be read.
+    // Concurrent-safe because dialog callbacks run on the Swing EDT (add) but
+    // readFile runs synchronously on the CEF callback thread (contains/remove).
+    private final Set<String> allowedReadPaths = ConcurrentHashMap.newKeySet();
 
     // Security: allowed file extensions for write operations
     private static final Set<String> ALLOWED_WRITE_EXTENSIONS = new HashSet<>(
@@ -48,6 +53,34 @@ public class JavaBridge {
 
     public JavaBridge(Component parentFrame) {
         this.parentFrame = parentFrame;
+        // Create a "Spatio Projects" folder in the user's Documents on startup
+        // and default every file dialog to it. On a locked-down school machine
+        // this is the path that reliably works: it's per-user, no admin rights
+        // needed, and if the school uses Windows Folder Redirection via GPO
+        // it routes automatically to the student's network home drive so work
+        // follows them between machines.
+        //
+        // If Documents isn't writable for some reason, fall back to
+        // ~/Spatio Projects/. If even that fails (really locked-down profile),
+        // leave lastDirectory null so JFileChooser picks its own default.
+        File dir = tryCreate(Paths.get(System.getProperty("user.home"), "Documents", "Spatio Projects"));
+        if (dir == null) dir = tryCreate(Paths.get(System.getProperty("user.home"), "Spatio Projects"));
+        this.lastDirectory = dir;
+        if (dir != null) {
+            System.out.println("[JavaBridge] Default save/load folder: " + dir.getAbsolutePath());
+        } else {
+            System.err.println("[JavaBridge] Could not create a Spatio Projects folder; dialogs will open at JFileChooser default.");
+        }
+    }
+
+    private static File tryCreate(Path path) {
+        try {
+            Files.createDirectories(path);
+            return path.toFile();
+        } catch (IOException e) {
+            System.err.println("[JavaBridge] Could not create " + path + ": " + e.getMessage());
+            return null;
+        }
     }
 
     public void setFrame(Component frame) {

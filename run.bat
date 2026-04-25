@@ -6,13 +6,16 @@ setlocal
 title Spatio Studio
 cd /d "%~dp0"
 
-set "JAR=target\spatio-studio-1.0.0-SNAPSHOT.jar"
+rem Match the latest shaded fat JAR by glob so version bumps don't break us.
+rem Excludes the pre-shade "original-*.jar" file maven-shade leaves behind.
+set "JAR="
+for /f "delims=" %%F in ('dir /b /a:-d /o:-d "target\spatio-studio-*.jar" 2^>nul ^| findstr /v /b "original-"') do (
+    if not defined JAR set "JAR=target\%%F"
+)
 
-if not exist "%JAR%" (
+if not defined JAR (
     echo.
-    echo [run.bat] Fat JAR not found at:
-    echo    %CD%\%JAR%
-    echo.
+    echo [run.bat] Fat JAR not found in target\.
     echo Build it first:
     echo    mvn clean package
     echo.

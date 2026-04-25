@@ -237,9 +237,14 @@ useful as a warm-up exercise for a class session.
 - **Save** writes a `.spatio` project file. This is a single JSON
   document containing every object in your scene, its transform, its
   color and material, the camera position, and any stamps you've
-  created.
-- **Open** restores a `.spatio` file. Only files saved by version 2 of
-  the app are accepted — this is the current format.
+  created. By default, Save drops you into a `Spatio Projects` folder
+  inside your Documents — the app creates that folder the first time
+  it runs, so you always have a reliable place to put your work. You
+  can still navigate to a USB stick or any other folder from inside the
+  dialog.
+- **Open** restores a `.spatio` file. Defaults to the same
+  `Spatio Projects` folder. Only files saved by version 2 of the app
+  are accepted — this is the current format.
 
 ### Screenshot
 
@@ -297,9 +302,12 @@ panel in-app.
 - **Encourage exporting to STL** — most schools now have at least one
   3D printer, and there is no substitute for the moment a student holds
   something they designed.
-- **Projects are portable.** Tell students to save their `.spatio` files
-  to a shared drive or USB stick — they can open the same project on
-  any Spatio installation at home.
+- **Projects are portable.** By default they land in
+  `Documents\Spatio Projects\` on the student's user profile, which on
+  most school machines is redirected to the student's network home
+  drive — so work follows them between lab machines automatically. For
+  take-home or cross-district use, have students Save As to a USB stick
+  and open from that same stick anywhere Spatio is installed.
 - **No accounts, ever.** If a kid asks "how do I log in" the answer is
   "you don't — your work is on this computer." This is the point.
 
