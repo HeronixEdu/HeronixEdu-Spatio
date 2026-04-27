@@ -1,0 +1,70 @@
+SPATIO STUDIO 1.0.0
+===================
+
+Free, offline 3D modeling for kids ages 6-14.
+From Heronix Education Systems LLC.
+
+Thank you for downloading Spatio Studio. We hope your students
+have fun building, painting, and 3D printing what they make.
+
+------------------------------------------------------------
+TO RUN THE APP
+------------------------------------------------------------
+
+Open the SpatioStudio folder.
+Double-click "SpatioStudio.exe".
+
+That's it. The app starts. No install, no login, no internet
+needed, nothing to set up. The first launch takes about 30
+seconds while the app extracts its Chromium runtime to your
+user profile folder. Every launch after that is instant.
+
+You can keep the SpatioStudio folder anywhere you like — your
+Desktop, your Documents folder, an external drive, or a network
+share. The app runs in place; nothing has to be "installed"
+in the traditional sense.
+
+------------------------------------------------------------
+WHERE YOUR WORK GOES
+------------------------------------------------------------
+
+When you click Save inside the app, your project is saved to a
+folder called "Spatio Projects" inside your Documents folder.
+The app creates this folder automatically the first time you
+save. You can open Documents → Spatio Projects in Windows
+Explorer at any time to find your saved files.
+
+You can also Save As to choose any other folder you like — a
+USB stick, a OneDrive folder, the desktop, anywhere.
+
+------------------------------------------------------------
+WANT TO KNOW MORE?
+------------------------------------------------------------
+
+Open the Documentation folder.
+
+   User Manual.md            - Every feature in detail. Walks
+                               you through shapes, the paint
+                               tool, cutting holes with CSG,
+                               saving and exporting, the
+                               built-in tutorials, and more.
+
+   About Spatio Studio.md    - Why we built this and what it's
+                               for.
+
+   Security and Offline      - Notes for parents and IT folks
+   Posture.md                  about the app's privacy posture.
+                               Spatio makes zero outbound
+                               network connections.
+
+   README.md                 - General project overview.
+
+------------------------------------------------------------
+LICENSE
+------------------------------------------------------------
+
+Spatio Studio is free for educational use. The full terms are
+in the LICENSE.txt file next to this one.
+
+(c) Heronix Education Systems LLC. All rights reserved.
+Part of the Heronix Education Platform.

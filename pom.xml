@@ -220,6 +220,48 @@
                                     </target>
                                 </configuration>
                             </execution>
+                            <execution>
+                                <!--
+                                  Curated website-download zip.
+                                  Same app, but only end-user-facing content:
+                                  no MSI, no IT-deployment block, no internal
+                                  notes. Targeted at teachers / parents / kids
+                                  who download from the marketing site.
+                                -->
+                                <id>build-website-zip</id>
+                                <phase>verify</phase>
+                                <goals><goal>run</goal></goals>
+                                <configuration>
+                                    <target>
+                                        <delete dir="${project.build.directory}/website-stage" quiet="true"/>
+                                        <mkdir dir="${project.build.directory}/website-stage/Heronix-SpatioV1/Documentation"/>
+                                        <!-- The app -->
+                                        <copy todir="${project.build.directory}/website-stage/Heronix-SpatioV1/SpatioStudio">
+                                            <fileset dir="${project.build.directory}/dist/SpatioStudio"/>
+                                        </copy>
+                                        <!-- License at the root for visibility -->
+                                        <copy file="${project.basedir}/LICENSE.txt"
+                                              todir="${project.build.directory}/website-stage/Heronix-SpatioV1"/>
+                                        <!-- Curated user-facing docs (skip Installation Guide — has dev/IT content) -->
+                                        <copy file="${project.basedir}/README.md"
+                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/Documentation/README.md"/>
+                                        <copy file="${project.basedir}/ABOUT.md"
+                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/Documentation/About Spatio Studio.md"/>
+                                        <copy file="${project.basedir}/SECURITY.md"
+                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/Documentation/Security and Offline Posture.md"/>
+                                        <copy file="${project.basedir}/docs/USER-MANUAL.md"
+                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/Documentation/User Manual.md"/>
+                                        <!-- Friendly start-here pointer -->
+                                        <copy file="${project.basedir}/dist-assets/website-start.txt"
+                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/START HERE.txt"/>
+                                        <!-- Zip with Heronix-SpatioV1/ as the only top-level folder -->
+                                        <zip destfile="${project.build.directory}/dist/Heronix-SpatioV1.zip"
+                                             basedir="${project.build.directory}/website-stage"
+                                             includes="Heronix-SpatioV1/**"/>
+                                        <delete dir="${project.build.directory}/website-stage" quiet="true"/>
+                                    </target>
+                                </configuration>
+                            </execution>
                         </executions>
                     </plugin>
                 </plugins>
