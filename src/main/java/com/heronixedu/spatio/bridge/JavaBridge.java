@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -98,9 +99,11 @@ public class JavaBridge {
                     String content = json.get("content").getAsString();
                     SwingUtilities.invokeLater(() -> {
                         try {
+                            // "" = user cancelled; a path = saved; exception = failed
                             String savedPath = doDownloadFile(name, content);
                             callback.success(savedPath);
                         } catch (Exception e) {
+                            System.err.println("[JavaBridge] Save failed: " + e.getMessage());
                             callback.failure(-1, "Save failed");
                         }
                     });
@@ -175,48 +178,85 @@ public class JavaBridge {
         }
     }
 
-    private String doDownloadFile(String defaultName, String content) {
-        try {
-            // SECURITY: Sanitize default filename
-            defaultName = sanitizeFilename(defaultName);
+    /**
+     * Shows a save dialog and writes the file.
+     * @return the saved absolute path, or "" if the user cancelled
+     * @throws IOException if the file could not be written (or its type is blocked)
+     */
+    private String doDownloadFile(String defaultName, String content) throws IOException {
+        // SECURITY: Sanitize default filename
+        defaultName = sanitizeFilename(defaultName);
 
-            JFileChooser chooser = new JFileChooser();
-            chooser.setDialogTitle("Save File — Choose where to save your work");
-            chooser.setSelectedFile(new File(defaultName));
-            if (lastDirectory != null) chooser.setCurrentDirectory(lastDirectory);
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("Save File — Choose where to save your work");
+        chooser.setSelectedFile(new File(defaultName));
+        if (lastDirectory != null) chooser.setCurrentDirectory(lastDirectory);
 
-            if (defaultName.endsWith(".stl")) {
-                chooser.setFileFilter(new FileNameExtensionFilter("STL Files (*.stl)", "stl"));
-            } else if (defaultName.endsWith(".obj")) {
-                chooser.setFileFilter(new FileNameExtensionFilter("OBJ Files (*.obj)", "obj"));
-            } else if (defaultName.endsWith(".gltf")) {
-                chooser.setFileFilter(new FileNameExtensionFilter("GLTF Files (*.gltf)", "gltf"));
-            } else if (defaultName.endsWith(".spatio")) {
-                chooser.setFileFilter(new FileNameExtensionFilter("Spatio Projects (*.spatio)", "spatio"));
+        if (defaultName.endsWith(".stl")) {
+            chooser.setFileFilter(new FileNameExtensionFilter("STL Files (*.stl)", "stl"));
+        } else if (defaultName.endsWith(".obj")) {
+            chooser.setFileFilter(new FileNameExtensionFilter("OBJ Files (*.obj)", "obj"));
+        } else if (defaultName.endsWith(".gltf")) {
+            chooser.setFileFilter(new FileNameExtensionFilter("GLTF Files (*.gltf)", "gltf"));
+        } else if (defaultName.endsWith(".spatio")) {
+            chooser.setFileFilter(new FileNameExtensionFilter("Spatio Projects (*.spatio)", "spatio"));
+        } else if (defaultName.endsWith(".png")) {
+            chooser.setFileFilter(new FileNameExtensionFilter("PNG Images (*.png)", "png"));
+        }
+
+        // Screenshots arrive as a PNG data URL; decode before showing the dialog
+        // so a bad payload fails without the kid picking a file first.
+        boolean isPng = defaultName.endsWith(".png");
+        byte[] pngBytes = isPng ? decodePngDataUrl(content) : null;
+
+        if (chooser.showSaveDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
+            File file = chooser.getSelectedFile();
+            // Ensure correct extension
+            String ext = defaultName.substring(defaultName.lastIndexOf('.'));
+            if (!file.getName().contains(".") || (isPng && !file.getName().toLowerCase().endsWith(".png"))) {
+                file = new File(file.getAbsolutePath() + ext);
             }
-
-            if (chooser.showSaveDialog(parentFrame) == JFileChooser.APPROVE_OPTION) {
-                File file = chooser.getSelectedFile();
-                // Ensure correct extension
-                String ext = defaultName.substring(defaultName.lastIndexOf('.'));
-                if (!file.getName().contains(".")) {
-                    file = new File(file.getAbsolutePath() + ext);
-                }
-                // SECURITY: Validate extension
-                String fileExt = getExtension(file.getName());
-                if (!ALLOWED_WRITE_EXTENSIONS.contains(fileExt)) {
-                    System.err.println("[JavaBridge] BLOCKED write (bad extension): " + file.getName());
-                    return "";
-                }
+            // SECURITY: Validate extension
+            String fileExt = getExtension(file.getName());
+            if (!ALLOWED_WRITE_EXTENSIONS.contains(fileExt)) {
+                System.err.println("[JavaBridge] BLOCKED write (bad extension): " + file.getName());
+                throw new IOException("File type not allowed: " + fileExt);
+            }
+            if (isPng) {
+                Files.write(file.toPath(), pngBytes);
+            } else {
                 Files.writeString(file.toPath(), content);
-                lastDirectory = file.getParentFile();
-                System.out.println("[JavaBridge] Saved to: " + file.getAbsolutePath());
-                return file.getAbsolutePath();
             }
-        } catch (Exception e) {
-            System.err.println("[JavaBridge] Save failed: " + e.getMessage());
+            lastDirectory = file.getParentFile();
+            System.out.println("[JavaBridge] Saved to: " + file.getAbsolutePath());
+            return file.getAbsolutePath();
         }
         return "";
+    }
+
+    private static final String PNG_DATA_URL_PREFIX = "data:image/png;base64,";
+    private static final byte[] PNG_SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+
+    /**
+     * Decodes a canvas.toDataURL('image/png') string to raw PNG bytes.
+     * @throws IOException if the payload isn't a base64 PNG data URL
+     */
+    private static byte[] decodePngDataUrl(String dataUrl) throws IOException {
+        if (dataUrl == null || !dataUrl.startsWith(PNG_DATA_URL_PREFIX)) {
+            throw new IOException("Screenshot data is not a PNG data URL");
+        }
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(dataUrl.substring(PNG_DATA_URL_PREFIX.length()));
+        } catch (IllegalArgumentException e) {
+            throw new IOException("Screenshot data is not valid base64", e);
+        }
+        // SECURITY: only write bytes that really are a PNG
+        if (bytes.length < PNG_SIGNATURE.length
+                || !Arrays.equals(Arrays.copyOf(bytes, PNG_SIGNATURE.length), PNG_SIGNATURE)) {
+            throw new IOException("Screenshot data is not a PNG image");
+        }
+        return bytes;
     }
 
     private String doShowOpenDialog() {

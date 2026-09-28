@@ -390,12 +390,13 @@ public class SpatioApplication {
 
     private static final String BRIDGE_JS =
         "window.javaApp = {" +
+        // Resolves with the saved file path ('' = user cancelled); rejects if saving failed.
         "  downloadFile: function(name, content) {" +
-        "    return new Promise(function(resolve) {" +
+        "    return new Promise(function(resolve, reject) {" +
         "      window.javaQuery({" +
         "        request: JSON.stringify({action:'downloadFile', name:name, content:content})," +
-        "        onSuccess: function(r) { resolve(r === 'true'); }," +
-        "        onFailure: function() { resolve(false); }" +
+        "        onSuccess: function(r) { resolve(typeof r === 'string' ? r : ''); }," +
+        "        onFailure: function(code, msg) { reject(new Error(msg || 'Save failed')); }" +
         "      });" +
         "    });" +
         "  }," +

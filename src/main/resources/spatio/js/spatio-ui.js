@@ -50,7 +50,9 @@ function duplicateSelected() {
   clone.position.x += 1.5;
   clone.position.z += 1.5;
   scene.add(clone);
-  objects.push({root:clone, type:src.type, name:src.name+' Copy'});
+  // Copy params/hole/group data too — Save relies on params matching the geometry
+  objects.push({root:clone, type:src.type, name:src.name+' Copy', isHole:!!src.isHole, groupId:null,
+                originalData:src.originalData || null, params:Object.assign({}, src.params || {})});
   updateObjCount();
   selectObj(objects[objects.length-1]);
 }

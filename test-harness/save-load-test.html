@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RUNNING</title>
+<!--
+  Spatio Studio save/load round-trip test.
+  Loads the real app scripts (no WebGL renderer needed), builds one of every object
+  kind, saves, reloads, and compares. Results go to the OUT block and the page title.
+  Run:  test-harness\run-save-load-test.bat   (headless Edge, prints the report)
+  Or open this file directly in Chrome/Edge and read the page.
+-->
+</head>
+<body>
+<pre id="out"></pre>
+<script>
+// Any element id the app asks for that isn't here is faked with a detached element.
+(function() {
+  var realGet = document.getElementById.bind(document);
+  var fakes = {};
+  document.getElementById = function(id) {
+    var el = realGet(id);
+    if (el) return el;
+    if (!fakes[id]) { fakes[id] = document.createElement(id.charAt(0) === 'p' ? 'input' : 'div'); fakes[id].id = id; }
+    return fakes[id];
+  };
+})();
+window.__errors = [];
+window.onerror = function(msg, url, line) { window.__errors.push(msg + ' @' + (url || '').split('/').pop() + ':' + line); };
+</script>
+<script src="../src/main/resources/spatio/js/three.min.js"></script>
+<script src="../src/main/resources/spatio/js/three-csg.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-modal.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-core.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-shapes.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-interaction.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-properties.js"></script>
+<script src="../src/main/resources/spatio/js/font-helvetiker-bold.js"></script>
+<script src="../src/main/resources/spatio/js/font-helvetiker.js"></script>
+<script src="../src/main/resources/spatio/js/font-optimer-bold.js"></script>
+<script src="../src/main/resources/spatio/js/font-optimer.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-text.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-params.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-csg.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-io.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-ui.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-crosssection.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-mirror.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-subdivide.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-materials.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-ruler.js"></script>
+<script src="../src/main/resources/spatio/js/SVGLoader.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-svgimport.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-paint.js"></script>
+<script src="../src/main/resources/spatio/js/spatio-stamps.js"></script>
+<script>
+var results = [], passCount = 0, failCount = 0;
+function check(name, ok, detail) {
+  if (ok) passCount++; else failCount++;
+  results.push((ok ? 'PASS ' : 'FAIL ') + name + (detail && !ok ? '  -> ' + detail : ''));
+}
+function near(a, b, tol) { return Math.abs(a - b) <= (tol || 1e-3); }
+function nearArr(a, b, tol) {
+  if (a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (!near(a[i], b[i], tol)) return false;
+  return true;
+}
+
+// ── Stub the parts that need a real window/WebGL ──
+scene = new THREE.Scene();
+camera = new THREE.PerspectiveCamera(54, 1, 0.05, 400);
+renderer = { localClippingEnabled: false };
+transformControl = null;
+var alerts = [];
+spatioAlert = function(icon, title, msg) { alerts.push(title + ' | ' + msg); };
+showToast = function() {};
+var savedJson = null;
+var realDl = dl;
+dl = function(name, content) { savedJson = content; };
+
+function lastObj() { return objects[objects.length - 1]; }
+function meshes(obj) { var m = []; obj.root.traverse(function(c) { if (c.isMesh && !c.userData.helper) m.push(c); }); return m; }
+
+// Snapshot everything that must survive a round trip
+function snap(obj) {
+  obj.root.updateMatrixWorld(true);
+  var box = new THREE.Box3().setFromObject(obj.root);
+  var ms = meshes(obj);
+  var verts = 0, colorSum = 0, hasColors = false;
+  ms.forEach(function(m) {
+    verts += m.geometry.attributes.position.count;
+    var ca = m.geometry.attributes.color;
+    if (ca) { hasColors = true; for (var i = 0; i < ca.array.length; i++) colorSum += ca.array[i] * ((i % 7) + 1); }
+  });
+  var m0 = ms[0] ? (Array.isArray(ms[0].material) ? ms[0].material[0] : ms[0].material) : null;
+  return {
+    type: obj.type, name: obj.name, isHole: !!obj.isHole, visible: obj.root.visible,
+    pos: obj.root.position.toArray(), rot: [obj.root.rotation.x, obj.root.rotation.y, obj.root.rotation.z],
+    scale: obj.root.scale.toArray(), params: JSON.stringify(obj.params || {}),
+    meshCount: ms.length, verts: verts, bbMin: box.min.toArray(), bbMax: box.max.toArray(),
+    hasColors: hasColors, colorSum: colorSum,
+    color: m0 ? m0.color.getHex() : null,
+    origColor: ms[0] ? ms[0].userData.originalColor : undefined,
+    holeLook: ms.length ? ms.every(function(m) { return m.userData.isHoleMesh === true && m.material.transparent && near(m.material.opacity, 0.35); }) : false,
+    roughness: m0 ? m0.roughness : null, metalness: m0 ? m0.metalness : null,
+    opacity: m0 ? m0.opacity : null, transparent: m0 ? m0.transparent : null,
+    emissive: (m0 && m0.emissive) ? m0.emissive.getHex() : 0,
+    vertexColors: m0 ? !!m0.vertexColors : false,
+    childColors: ms.map(function(m) { return m.material.color.getHex(); }).join(','),
+    originalData: obj.originalData ? obj.originalData.length : 0
+  };
+}
+function compareSnaps(label, a, b) {
+  var diffs = [];
+  ['type','name','isHole','visible','params','meshCount','verts','hasColors','color','holeLook',
+   'transparent','vertexColors','emissive','childColors','originalData'].forEach(function(k) {
+    if (a[k] !== b[k]) diffs.push(k + ': ' + a[k] + ' != ' + b[k]);
+  });
+  ['pos','rot','scale','bbMin','bbMax'].forEach(function(k) {
+    if (!nearArr(a[k], b[k], 2e-3)) diffs.push(k + ': ' + a[k] + ' != ' + b[k]);
+  });
+  ['roughness','metalness','opacity','colorSum'].forEach(function(k) {
+    if (a[k] !== null && !near(a[k], b[k], 0.01)) diffs.push(k + ': ' + a[k] + ' != ' + b[k]);
+  });
+  if (a.origColor !== b.origColor) diffs.push('originalColor: ' + a.origColor + ' != ' + b.origColor);
+  check(label, diffs.length === 0, diffs.join('; '));
+}
+
+function selectOnly(list) {
+  deselect();
+  selectObj(list[0]);
+  for (var i = 1; i < list.length; i++) toggleMultiSelect(list[i]);
+}
+
+try {
+  // 1. Primitive with non-default params + rubber material (metalness 0)
+  addShape('box');
+  var box = lastObj();
+  box.params = { width: 4, height: 1.5, depth: 3 };
+  rebuildShapeGeometry(box);
+  applyColor('#ff0000');
+  applyMaterialPreset('rubber');
+  box.name = 'Big Red Box';
+  box.root.position.set(3, 0.75, -2);
+
+  // 2. Mirrored primitive (negative scale) with params
+  addShape('cylinder');
+  var cyl = lastObj();
+  cyl.params = { radius: 0.5, height: 4, segments: 12 };
+  rebuildShapeGeometry(cyl);
+  cyl.root.scale.set(-1, 2, 1.5);
+  cyl.root.rotation.set(0.3, -0.2, 1.1);
+
+  // 3. Hole (sphere) — keep its see-through look
+  addShape('sphere');
+  var hole = lastObj();
+  applyColor('#123456');
+  hole.isHole = true;
+  applyHoleAppearance(hole);
+  hole.root.position.set(-4, 1, 4);
+
+  // 4. CSG group: box minus cylinder hole
+  addShape('box'); var gA = lastObj(); gA.root.position.set(0, 1, 8);
+  addShape('cylinder'); var gB = lastObj(); gB.root.position.set(0, 1, 8); gB.root.scale.set(0.5, 2, 0.5);
+  gB.isHole = true; applyHoleAppearance(gB);
+  selectOnly([gA, gB]);
+  groupSelected();
+  var grp = lastObj();
+  grp.root.position.x += 2; grp.root.rotation.y = 0.7;
+
+  // 5. 3D text with non-default size, and a quick letter
+  textSize = 2.2; textDepth = 0.4;
+  addText('Hi5');
+  var txt = lastObj(); txt.root.position.set(-6, 2, -6);
+  textSize = 1.5; textDepth = 0.8;
+  addLetter('Q');
+  var letter = lastObj();
+  letter.root.scale.set(1, 1, -1);
+
+  // 6. SVG import (two coloured paths)
+  parseSVGContent('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">' +
+    '<path d="M0 0 L10 0 L10 10 Z" fill="#00ff00"/>' +
+    '<path d="M12 12 L20 12 L20 20 L12 20 Z" fill="#0000ff"/></svg>');
+  var svg = lastObj();
+
+  // 7. Painted mesh (vertex colours via the paint tool helper)
+  addShape('box');
+  var painted = lastObj();
+  enableVertexColors(painted.root);
+  var ca = painted.root.geometry.attributes.color;
+  var red = new THREE.Color('#ef4444');
+  for (var i = 0; i < 4; i++) ca.setXYZ(i, red.r, red.g, red.b);
+  ca.needsUpdate = true;
+  painted.root.position.set(6, 1, 6);
+
+  // 8. Group-rooted primitive (capsule), hidden object, glow material
+  addShape('capsule'); var caps = lastObj(); caps.root.visible = false;
+  addShape('star'); var star = lastObj(); applyMaterialPreset('glow');
+
+  // 9. Smoothed (subdivided) shape
+  addShape('octahedron'); var oct = lastObj(); applySubdivide(1, 0.3);
+
+  // 10. Duplicate of a param-edited primitive (must keep params)
+  selectOnly([box]); duplicateSelected(); var dup = lastObj();
+
+  var kinds = ['box(params+rubber)','mirrored cylinder','hole sphere','CSG group','text','letter Q','svg','painted box','hidden capsule','glow star','smoothed octahedron','duplicated box'];
+  check('created ' + kinds.length + ' objects', objects.length === kinds.length, 'objects=' + objects.length);
+  check('CSG group has originalData', grp.type === 'group' && grp.originalData && grp.originalData.length === 2);
+
+  var before = objects.map(snap);
+  var sceneRootsBefore = objects.map(function(o) { return o.root; });
+
+  // ── SAVE ──
+  saveUndo(); saveUndo();   // make sure load clears history
+  saveProject();
+  check('saveProject produced JSON', typeof savedJson === 'string' && savedJson.length > 0);
+  var parsed = JSON.parse(savedJson);
+  check('file version is 3', parsed.version === 3, parsed.version);
+  var withMesh = parsed.objects.filter(function(o) { return !!o.mesh; }).map(function(o) { return o.type; });
+  check('geometry stored only for group/svg/painted/smoothed', withMesh.join(',') === 'group,svg,box,octahedron', withMesh.join(','));
+  results.push('INFO file size: ' + (savedJson.length / 1024).toFixed(1) + ' KB for ' + parsed.objects.length + ' objects');
+  parsed.objects.forEach(function(o, i) {
+    results.push('INFO   ' + kinds[i] + ': ' + (JSON.stringify(o).length / 1024).toFixed(1) + ' KB' + (o.mesh ? ' (mesh)' : ''));
+  });
+
+  // ── LOAD ──
+  alerts = [];
+  doLoadProject(savedJson);
+  check('same object count after load', objects.length === before.length, objects.length + ' vs ' + before.length);
+  check('no load warnings', alerts.length === 0, alerts.join(' || '));
+  check('undo history cleared', undoStack.length === 0, undoStack.length);
+  check('selection cleared', selectedObjects.length === 0 && selectedRoot === null);
+  check('old objects removed from scene', sceneRootsBefore.every(function(r) { return r.parent === null; }));
+  var rootsInScene = scene.children.filter(function(c) { return !c.userData.helper && !c.isBoxHelper; });
+  check('scene holds exactly the loaded objects', rootsInScene.length === objects.length, rootsInScene.length + ' vs ' + objects.length);
+  var after = objects.map(snap);
+  for (var k = 0; k < Math.min(before.length, after.length); k++) compareSnaps('round trip: ' + kinds[k], before[k], after[k]);
+
+  // Second save must be identical (stable format)
+  var firstJson = savedJson;
+  saveProject();
+  check('save -> load -> save is stable', savedJson === firstJson,
+        'len ' + firstJson.length + ' vs ' + savedJson.length);
+
+  // Ungroup works on the reloaded group
+  var g2 = objects.filter(function(o) { return o.type === 'group'; })[0];
+  selectOnly([g2]);
+  alerts = [];
+  ungroupSelected();
+  var ung = objects.slice(-2);
+  check('ungroup after reload restores 2 shapes (1 hole)',
+        objects.length === before.length + 1 && ung[0].type === 'box' && ung[1].type === 'cylinder' &&
+        !ung[0].isHole && ung[1].isHole && alerts.length === 0, alerts.join('|'));
+  check('ungrouped hole has see-through look', snap(ung[1]).holeLook);
+
+  // Undo after load works (and doesn't resurrect pre-load objects)
+  undo();
+  check('undo after load restores group, no old objects', objects.length === before.length &&
+        objects.every(function(o) { return sceneRootsBefore.indexOf(o.root) === -1; }));
+
+  // Reloaded hole can be turned back to solid with its colour
+  var h2 = objects[2];
+  selectOnly([h2]); toggleHoleSelected();
+  check('reloaded hole -> solid keeps colour', !h2.isHole && meshes(h2)[0].material.color.getHex() === 0x123456 && !meshes(h2)[0].material.transparent);
+
+  // ── Backward compat: v2 file ──
+  var v2 = { version: 2, appVersion: '1.0.0', camera: { r: 30, theta: 0.1, phi: 1, target: [1, 2, 3] }, objects: [
+    { type: 'sphere', name: 'Ball', isHole: false, position: [1,2,3], rotation: [0,0,0], scale: [1,-1,1], color: '#00ff00', visible: true,
+      params: { radius: 2.5, segments: 16 }, material: { roughness: 0.9, metalness: 0, transparent: false, opacity: 1 } },
+    { type: 'text', name: 'Text: Yo', isHole: false, position: [0,1,0], rotation: [0,0,0], scale: [1,1,1], color: '#ff00ff', visible: true,
+      params: { text: 'Yo', font: 'optimer', size: 3, depth: 0.5, bevel: false }, material: { roughness: 0.45, metalness: 0.08, transparent: false, opacity: 1 } },
+    { type: 'group', name: 'Group (2 solids)', isHole: false, position: [0,0,0], rotation: [0,0,0], scale: [1,1,1], color: '#ffffff', visible: true, params: {} },
+    { type: 'svg', name: 'SVG Import (3 paths)', isHole: false, position: [0,0,0], rotation: [0,0,0], scale: [1,1,1], color: '#ffffff', visible: true, params: { depth: 1 } },
+    { type: 'cone', name: 'Hole Cone', isHole: true, position: [0,0,0], rotation: [0,0,0], scale: [1,1,1], color: '#abcdef', visible: false,
+      params: {}, material: { roughness: 0.45, metalness: 0.08, transparent: true, opacity: 0.35 } }
+  ], stamps: [] };
+  alerts = [];
+  doLoadProject(JSON.stringify(v2));
+  check('v2: 3 of 5 objects restored', objects.length === 3, objects.length);
+  check('v2: group + svg reported to user', alerts.length === 1 && alerts[0].indexOf('Group (2 solids)') !== -1 && alerts[0].indexOf('SVG Import') !== -1, alerts.join('|'));
+  var ball = objects[0];
+  var bb = new THREE.Box3().setFromObject(ball.root);
+  check('v2: sphere params re-applied (radius 2.5)', near(bb.max.x - bb.min.x, 5, 0.01) && ball.params.radius === 2.5, (bb.max.x - bb.min.x));
+  check('v2: metalness 0 kept (not reset to 0.08)', meshes(ball)[0].material.metalness === 0 && meshes(ball)[0].material.roughness === 0.9);
+  check('v2: mirrored scale kept', ball.root.scale.y === -1);
+  var yo = objects[1];
+  check('v2: text restored from params', yo.type === 'text' && yo.params.text === 'Yo' && yo.params.font === 'optimer' && yo.params.size === 3 &&
+        meshes(yo)[0].material.color.getHex() === 0xff00ff);
+  var hc = objects[2];
+  check('v2: hole + hidden restored', hc.isHole && snap(hc).holeLook && hc.root.visible === false);
+  check('v2: camera restored', near(cam.r, 30) && near(camTarget.y, 2));
+
+  // ── v1 (no version field, 'letter' type) ──
+  alerts = [];
+  doLoadProject(JSON.stringify({ objects: [{ type: 'letter', name: 'Letter Z', position: [0,0,0], rotation: [0,0,0], scale: [1,1,1], color: '#ff0000' }] }));
+  check('v1: letter restored', objects.length === 1 && objects[0].type === 'text' && objects[0].params.text === 'Z' && alerts.length === 0, alerts.join('|'));
+
+  // ── Newer file is refused without touching the scene ──
+  alerts = [];
+  var keep = objects[0];
+  doLoadProject(JSON.stringify({ version: 4, objects: [] }));
+  check('v4 file refused, scene untouched', objects.length === 1 && objects[0] === keep && alerts.length === 1 && alerts[0].indexOf('newer') !== -1, alerts.join('|'));
+
+  // ── Corrupt entries are reported, not silently dropped; good ones still load ──
+  alerts = [];
+  doLoadProject(JSON.stringify({ version: 3, objects: [
+    { type: 'group', name: 'Broken Group', position: [0,0,0], rotation: [0,0,0], scale: [1,1,1], mesh: { geo: { position: [0,0,0, 1,0,0, 0,1,0], index: [0,1,7] } } },
+    { type: 'mystery', name: 'Alien Shape', position: [0,0,0], rotation: [0,0,0], scale: [1,1,1] },
+    { type: 'box', name: 'NaN Box', position: [0,'x',0], rotation: [0,0,0], scale: [1,1,1] },
+    { type: 'torus', name: 'Good Torus', position: [0,0,0], rotation: [0,0,0], scale: [1,1,1], params: { radius: 2, tube: 0.3, segments: 99999 } }
+  ] }));
+  check('corrupt: only good object loaded', objects.length === 1 && objects[0].name === 'Good Torus', objects.length);
+  check('corrupt: 3 failures listed', alerts.length === 1 && /Broken Group[\s\S]*Alien Shape[\s\S]*NaN Box/.test(alerts[0]), alerts.join('|'));
+  check('corrupt: huge slider value clamped', objects[0].params.segments === 64, objects[0].params.segments);
+  var inScene = scene.children.filter(function(c) { return !c.userData.helper && !c.isBoxHelper; }).length;
+  check('corrupt: no half-built objects left in scene', inScene === 1, inScene);
+
+} catch (e) {
+  check('test run threw', false, e && (e.stack || e.message));
+}
+
+// ── Save confirmation via the Java bridge contract: path = saved, '' = cancelled, reject = failed ──
+function bridgeCase(label, behaviour, expectTitle) {
+  return function() {
+    alerts = [];
+    window.javaApp = { downloadFile: function() {
+      return behaviour === 'reject' ? Promise.reject(new Error('Save failed')) : Promise.resolve(behaviour);
+    } };
+    realDl('my_project.spatio', '{}', 'Project saved!');
+    return new Promise(function(r) { setTimeout(r, 0); }).then(function() {
+      var got = alerts.length ? alerts[0].split(' | ')[0] : '(none)';
+      check('bridge: ' + label, got === expectTitle, 'got ' + got);
+    });
+  };
+}
+Promise.resolve()
+  .then(bridgeCase('saved path shows "Saved!"', 'C:\Users\kid\Documents\Spatio Projects\my_project.spatio', 'Saved!'))
+  .then(bridgeCase('cancel shows nothing', '', '(none)'))
+  .then(bridgeCase('failure shows error', 'reject', 'Couldn\'t save'))
+  .then(null, function(e) { check('bridge tests threw', false, e && e.message); })
+  .then(function() {
+    delete window.javaApp;
+    check('no uncaught page errors', window.__errors.length === 0, window.__errors.join(' | '));
+    document.title = (failCount === 0 ? 'ALL PASS ' : 'FAILURES ') + passCount + ' passed, ' + failCount + ' failed';
+    document.getElementById('out').textContent = document.title + '\n\n' + results.join('\n');
+  });
+</script>
+</body>
+</html>
