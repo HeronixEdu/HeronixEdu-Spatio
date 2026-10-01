@@ -1,4 +1,4 @@
-SPATIO STUDIO 1.0.0
+SPATIO STUDIO ${spatio.app.version}
 ===================
 
 Free, offline 3D modeling for kids ages 6-14.

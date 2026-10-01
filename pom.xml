@@ -201,7 +201,23 @@
                                 <phase>verify</phase>
                                 <goals><goal>run</goal></goals>
                                 <configuration>
-                                    <target>
+                                    <target xmlns:if="ant:if">
+                                        <!--
+                                          Code signing (release builds): with
+                                          -Dheronix.sign.script=<Sign-HeronixFile.ps1>
+                                          the launcher is signed as Heronix Education
+                                          Systems LLC before either zip is made. Without
+                                          the property this step is skipped.
+                                        -->
+                                        <exec executable="powershell" failonerror="true" if:set="heronix.sign.script">
+                                            <arg value="-NoProfile"/>
+                                            <arg value="-ExecutionPolicy"/>
+                                            <arg value="Bypass"/>
+                                            <arg value="-File"/>
+                                            <arg value="${heronix.sign.script}"/>
+                                            <arg value="-Path"/>
+                                            <arg file="${project.build.directory}/dist/SpatioStudio/SpatioStudio.exe"/>
+                                        </exec>
                                         <!--
                                           Drop LICENSE.txt into the bundle root
                                           so end users see it next to the .exe.
@@ -253,7 +269,9 @@
                                               tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/Documentation/User Manual.md"/>
                                         <!-- Friendly start-here pointer -->
                                         <copy file="${project.basedir}/dist-assets/website-start.txt"
-                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/START HERE.txt"/>
+                                              tofile="${project.build.directory}/website-stage/Heronix-SpatioV1/START HERE.txt">
+                                            <filterchain><expandproperties/></filterchain>
+                                        </copy>
                                         <!-- Zip with Heronix-SpatioV1/ as the only top-level folder -->
                                         <zip destfile="${project.build.directory}/dist/Heronix-SpatioV1.zip"
                                              basedir="${project.build.directory}/website-stage"

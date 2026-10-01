@@ -1,0 +1,115 @@
+# Signed Spatio Studio release (Gitea Actions, Windows build runner with label "heronix-sign")
+#
+#   git tag release-v1.0.1      && git push origin release-v1.0.1       -> test, build, sign, publish
+#   git tag release-test-v1.0.1 && git push origin release-test-v1.0.1  -> dry run: test, build, sign, verify only
+#
+# Builds the website zip (mvn -Pdist-windows) with SpatioStudio.exe signed as Heronix Education
+# Systems LLC, names it Heronix-Spatio-<version>.zip with a .sha256, and when publishing creates the
+# release "Spatio Studio <version>" here and uploads it to Cloudflare R2 (versioned + stable
+# Heronix-Spatio.zip) with Heronix-Demos/publish-to-r2.ps1, which checks the public copy.
+name: Signed Spatio release
+
+on:
+  push:
+    tags:
+      - 'release-v*'
+      - 'release-test-v*'
+
+jobs:
+  release:
+    runs-on: heronix-sign
+    steps:
+      - name: Test, build, sign and publish
+        shell: powershell
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          RELEASE_TOKEN: ${{ secrets.HERONIX_RELEASE_TOKEN }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Step($msg) { Write-Host "==> $msg" -ForegroundColor Cyan }
+          $publish = $env:REF_NAME -like 'release-v*'
+          $version = $env:REF_NAME -replace '^release-(test-)?v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Tag $env:REF_NAME does not carry a x.y.z version." }
+          $work = Join-Path (Get-Location) 'release-work'
+          if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+          New-Item -ItemType Directory -Force $work | Out-Null
+          $auth = "Authorization: token $env:RELEASE_TOKEN"
+
+          Step "Checking out heronix/Spatio at $env:REF_NAME"
+          git -c "http.extraHeader=$auth" clone --quiet --depth 1 --branch $env:REF_NAME "$env:SERVER/heronix/Spatio.git" "$work\src"
+          if ($LASTEXITCODE -ne 0) { throw 'Cloning Spatio failed.' }
+          $head = (git -C "$work\src" rev-parse HEAD).Trim()
+          if ($head -ne $env:COMMIT) { throw "$env:REF_NAME is at $head, not $env:COMMIT." }
+          # Signing script and R2 uploader; pointers only, the Demos repo's installers are not needed.
+          $env:GIT_LFS_SKIP_SMUDGE = '1'
+          git -c "http.extraHeader=$auth" clone --quiet --depth 1 "$env:SERVER/heronix/Heronix-Demos.git" "$work\demos"
+          if ($LASTEXITCODE -ne 0) { throw 'Cloning Heronix-Demos failed.' }
+          Remove-Item Env:\GIT_LFS_SKIP_SMUDGE
+          $sign = "$work\demos\signing\Sign-HeronixFile.ps1"
+          & powershell -NoProfile -ExecutionPolicy Bypass -File $sign -Check
+          if ($LASTEXITCODE -ne 0) { throw 'This runner cannot sign.' }
+
+          Step "Testing and building Spatio Studio $version (launcher signed)"
+          Push-Location "$work\src"
+          try {
+            & mvn -B -q clean verify -Pdist-windows "-Dspatio.app.version=$version" "-Dheronix.sign.script=$sign"
+            if ($LASTEXITCODE -ne 0) { throw "Build or tests failed (mvn exit $LASTEXITCODE)." }
+          } finally { Pop-Location }
+
+          $exe = "$work\src\target\dist\SpatioStudio\SpatioStudio.exe"
+          $sig = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'O=Heronix Education Systems LLC' -or -not $sig.TimeStamperCertificate) {
+            throw "SpatioStudio.exe is not properly signed ($($sig.Status))."
+          }
+          Write-Host "  SpatioStudio.exe signed by Heronix Education Systems LLC" -ForegroundColor Green
+
+          $out = "$work\out"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $zipName = "Heronix-Spatio-$version.zip"
+          Copy-Item "$work\src\target\dist\Heronix-SpatioV1.zip" "$out\$zipName"
+          $hash = (Get-FileHash "$out\$zipName" -Algorithm SHA256).Hash
+          Set-Content "$out\$zipName.sha256" "$hash  $zipName" -Encoding ascii
+          # The zip must carry the signed launcher, not an earlier copy.
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $z = [IO.Compression.ZipFile]::OpenRead("$out\$zipName")
+          try {
+            $entry = $z.Entries | Where-Object { $_.FullName -eq 'Heronix-SpatioV1/SpatioStudio/SpatioStudio.exe' }
+            if (-not $entry) { throw 'The zip has no Heronix-SpatioV1/SpatioStudio/SpatioStudio.exe.' }
+            $tmp = "$work\zip-check.exe"
+            [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $tmp, $true)
+          } finally { $z.Dispose() }
+          if ((Get-AuthenticodeSignature -LiteralPath $tmp).Status -ne 'Valid') { throw 'The launcher inside the zip is not signed.' }
+          Write-Host ("  {0}: {1} MB, launcher inside is signed" -f $zipName, [math]::Round((Get-Item "$out\$zipName").Length / 1MB, 1)) -ForegroundColor Green
+
+          if (-not $publish) {
+            Write-Host "Dry run complete: tested, built, signed and verified. Nothing was published ($out)." -ForegroundColor Yellow
+            return
+          }
+
+          Step "Creating the release release-v$version on heronix/Spatio"
+          $api = "$env:SERVER/api/v1/repos/heronix/Spatio"
+          $headers = @{ Authorization = "token $env:RELEASE_TOKEN" }
+          $release = try { Invoke-RestMethod -Headers $headers "$api/releases/tags/$env:REF_NAME" } catch { $null }
+          if (-not $release) {
+            $body = @{ tag_name = $env:REF_NAME; target_commitish = $head; name = "Spatio Studio $version"; prerelease = $false
+                       body = "Signed release built and tested by the release runner from $head.`n`nSpatioStudio.exe is signed by Heronix Education Systems LLC. SHA-256 of the zip: $hash" } | ConvertTo-Json
+            $release = Invoke-RestMethod -Headers $headers -Method Post -Uri "$api/releases" -ContentType 'application/json' -Body $body
+          }
+          foreach ($asset in @($zipName, "$zipName.sha256")) {
+            $existing = $release.assets | Where-Object { $_.name -eq $asset }
+            if ($existing) { Invoke-RestMethod -Headers $headers -Method Delete -Uri "$api/releases/assets/$($existing.id)" | Out-Null }
+            $null = Invoke-RestMethod -Headers $headers -Method Post -Uri "$api/releases/$($release.id)/assets?name=$asset" -InFile "$out\$asset" -ContentType 'application/octet-stream'
+            Write-Host "  attached $asset"
+          }
+
+          Step 'Uploading to Cloudflare R2'
+          & "$work\demos\publish-to-r2.ps1" -Product spatio -File "$out\$zipName" -NoRedirectHint
+          if ($LASTEXITCODE -ne 0) { throw "The R2 upload or its public check failed (exit $LASTEXITCODE)." }
+          Write-Host "Released Spatio Studio $version." -ForegroundColor Green
